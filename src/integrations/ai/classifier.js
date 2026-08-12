@@ -43,7 +43,7 @@ export async function classifyReply(replyText) {
   }
 
   try {
-    const completion = await client.chat.completions.parse({
+    const completion = await client.beta.chat.completions.parse({
       model: config.ai.model,
       messages: [
         {

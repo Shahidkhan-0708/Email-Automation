@@ -6,6 +6,7 @@ let transporter = null;
 
 function getTransporter() {
   if (!transporter) {
+    logger.info(`Initializing SMTP Transporter (${config.smtp.host}:${config.smtp.port})`);
     transporter = nodemailer.createTransport({
       host: config.smtp.host,
       port: config.smtp.port,
@@ -17,6 +18,18 @@ function getTransporter() {
     });
   }
   return transporter;
+}
+
+export async function verifyConnection() {
+  try {
+    const t = getTransporter();
+    await t.verify();
+    logger.info('✅ SMTP Brevo connection verified successfully!');
+    return true;
+  } catch (err) {
+    logger.error('❌ SMTP verification failed:', { error: err.message });
+    throw err;
+  }
 }
 
 export async function sendEmail({ toEmail, toName, subject, html, text, replyTo }) {

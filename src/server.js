@@ -194,6 +194,8 @@ app.post('/api/leads', requireApiKey, async (req, res) => {
         contact_id: contact.id,
         campaign_id: campaign.id,
         status: 'Ready',
+        claim_id: null,
+        claimed_at: null,
         sequence_step: 0,
         delivery_status: 'Pending',
       }, { onConflict: 'contact_id,campaign_id' })

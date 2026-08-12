@@ -6,7 +6,7 @@ export function requireApiKey(req, res, next) {
     return next();
   }
 
-  const apiKeyHeader = req.headers['x-api-key'];
+  const apiKeyHeader = req.headers['x-api-key'] || req.headers['apikey'];
   const authHeader = req.headers['authorization'];
   
   let token = apiKeyHeader;
