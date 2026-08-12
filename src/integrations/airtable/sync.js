@@ -44,6 +44,9 @@ export async function syncSupabaseToAirtable() {
 
       if (r.contacts?.name) fields['Applicant Name'] = r.contacts.name;
       if (r.id) fields['Application ID'] = r.id;
+      if (r.ai_summary || r.ai_category) {
+        fields['Notes'] = `[${r.ai_category || 'REPLIED'}] ${r.ai_summary || ''} -> Next Action: ${r.ai_next_action || ''}`;
+      }
 
       return { fields };
     });

@@ -42,7 +42,7 @@ export function getAuthenticatedGmailClient() {
 export async function getRecentReplies(afterTimestampDate = null) {
   try {
     const gmail = getAuthenticatedGmailClient();
-    
+
     // Convert date to epoch seconds for Gmail search query if provided
     let query = 'is:inbox';
     if (afterTimestampDate) {
@@ -70,7 +70,7 @@ export async function getRecentReplies(afterTimestampDate = null) {
 
       const messageData = msgRes.data;
       const headers = messageData.payload?.headers || [];
-      
+
       const fromHeader = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
       const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
       const dateHeader = headers.find(h => h.name.toLowerCase() === 'date')?.value || '';
