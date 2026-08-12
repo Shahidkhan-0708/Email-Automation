@@ -1,0 +1,26 @@
+{
+  "name": "college-outreach-automation",
+  "version": "1.0.0",
+  "description": "College Outreach Automation System V2",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch-path=src src/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.1",
+    "airtable": "^0.12.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "handlebars": "^4.7.8",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.0",
+    "openai": "^4.85.3",
+    "uuid": "^11.0.5",
+    "winston": "^3.17.0",
+    "zod": "^3.24.2"
+  }
+}

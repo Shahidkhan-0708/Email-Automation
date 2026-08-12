@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .footer { margin-top: 30px; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+    a { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p>Hi {{firstName}},</p>
+
+    {{#if personalization}}
+    <p>I recently came across {{personalization}} and found it particularly compelling.</p>
+    {{/if}}
+
+    <p>We're organizing a student initiative at our university and believe your experience as {{#if role}}{{role}}{{else}}a leader{{/if}}{{#if organization}} at {{organization}}{{/if}} would provide great perspective.</p>
+
+    <p>Would you be open to a quick 10-minute conversation to explore whether you might be interested in participating?</p>
+
+    <p>Best regards,<br>{{senderName}}</p>
+
+    <div class="footer">
+      <p>If you'd prefer not to receive further emails regarding this initiative, <a href="{{unsubscribeUrl}}">click here to opt out</a>.</p>
+    </div>
+  </div>
+</body>
+</html>
