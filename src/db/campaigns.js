@@ -5,18 +5,21 @@ import { config } from '../config/env.js';
 export async function getOrCreateDefaultCampaign() {
   const supabase = getSupabaseClient();
   const defaultName = 'V1 College Outreach Initiative';
-  
+
+  // NOTE: name is not unique, so use a deterministic single-row lookup.
+  // (maybeSingle() errors when multiple rows match on this PostgREST setup.)
   const { data: existing, error: selectErr } = await supabase
     .from('campaigns')
     .select('*')
     .eq('name', defaultName)
-    .maybeSingle();
+    .order('created_at', { ascending: true })
+    .limit(1);
 
   if (selectErr) {
     logger.error('Error fetching campaign:', { error: selectErr.message });
   }
 
-  if (existing) return existing;
+  if (existing && existing.length > 0) return existing[0];
 
   const { data: created, error: insertErr } = await supabase
     .from('campaigns')

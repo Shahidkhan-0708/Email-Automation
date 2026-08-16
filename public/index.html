@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>College Outreach Automation System V2</title>
+  <meta name="description" content="AI + Automation + Research + Trust + Human Control — End-to-End College Outreach Automation Architecture">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#/pipeline" class="sidebar-logo">
+          <div class="sidebar-logo-icon">AI</div>
+          <div class="sidebar-logo-text-wrap">
+            <span class="sidebar-logo-text">Outreach V2</span>
+            <span class="sidebar-logo-sub">AI Automation Engine</span>
+          </div>
+        </a>
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
+          <span>‹</span>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">LIVE WORKFLOW</div>
+        <a href="#/pipeline" class="nav-item active" data-view="pipeline">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">Visual Pipeline</span>
+          <span class="nav-badge-pill">Live</span>
+        </a>
+        <a href="#/dashboard" class="nav-item" data-view="dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <div class="nav-section-label">PIPELINE STAGES</div>
+        <a href="#/import" class="nav-item" data-view="import">
+          <span class="nav-icon">📥</span>
+          <span class="nav-label">1. Input & Extract</span>
+        </a>
+        <a href="#/people" class="nav-item" data-view="people">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">2. Profile Cleaning</span>
+        </a>
+        <a href="#/research" class="nav-item" data-view="research">
+          <span class="nav-icon">🧬</span>
+          <span class="nav-label">3. Context & Vision</span>
+        </a>
+        <a href="#/personalization" class="nav-item" data-view="personalization">
+          <span class="nav-icon">✨</span>
+          <span class="nav-label">4. AI Multi-Variants</span>
+          <span class="nav-badge-pill ai">10x</span>
+        </a>
+        <a href="#/review" class="nav-item" data-view="review">
+          <span class="nav-icon">✅</span>
+          <span class="nav-label">5. Review Queue</span>
+          <span class="nav-badge-count" id="nav-review-count">3</span>
+        </a>
+        <a href="#/outreach" class="nav-item" data-view="outreach">
+          <span class="nav-icon">📨</span>
+          <span class="nav-label">6. SendGrid Outreach</span>
+        </a>
+        <a href="#/replies" class="nav-item" data-view="replies">
+          <span class="nav-icon">↪️</span>
+          <span class="nav-label">7. Replies & Drips</span>
+          <span class="nav-badge-pill positive">Active</span>
+        </a>
+
+        <div class="nav-section-label">MANAGEMENT</div>
+        <a href="#/campaigns" class="nav-item" data-view="campaigns">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-label">Campaigns</span>
+        </a>
+        <a href="#/bulk-send" class="nav-item" data-view="bulk-send">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">Rate Limiter</span>
+        </a>
+        <a href="#/settings" class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings & API</span>
+        </a>
+
+        <div class="nav-divider"></div>
+
+        <a href="#/design-system" class="nav-item" data-view="design-system">
+          <span class="nav-icon">🎨</span>
+          <span class="nav-label">Design Tokens</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="system-status-indicator">
+          <span class="status-pulse-dot"></span>
+          <span class="status-pulse-text">LLM & SendGrid Connected</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <h1 class="header-title" id="page-title">Visual Pipeline Flow</h1>
+          <div class="breadcrumbs" id="breadcrumbs">
+            <span>Pipeline Architecture</span>
+            <span class="breadcrumb-sep">/</span>
+            <span id="breadcrumb-current">Visual Pipeline Flow</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="campaign-select-wrap">
+            <span class="campaign-select-icon">🎯</span>
+            <select class="campaign-select" id="campaign-selector">
+              <option value="default">Fall 2026 CS Research Outreach</option>
+              <option value="bio">Biomedical Engineering Grants</option>
+              <option value="ml">AI/ML Lab Partnerships</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-small" id="btn-quick-run">
+            <span>⚡ Run End-to-End Flow</span>
+          </button>
+          <button class="icon-button" id="notif-btn" title="Live Notifications">
+            🔔
+            <span class="badge-dot"></span>
+          </button>
+          <div class="avatar avatar-medium" style="background: linear-gradient(135deg, #2563eb, #7c3aed);" title="System Administrator">
+            SA
+          </div>
+        </div>
+      </header>
+
+      <!-- Dynamic Main Page Container -->
+      <main class="page-container" id="page-content">
+        <!-- Rendered dynamically by app.js -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Global Modal Overlay -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="section-title" id="modal-title">Modal Title</h3>
+        <button class="btn btn-tertiary btn-small" id="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Modal content -->
+      </div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

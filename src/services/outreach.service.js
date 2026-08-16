@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { delay } from '../utils/delay.js';
 import { renderEmailTemplate } from '../utils/template-engine.js';
 import { claimReadyLeads, updateOutreachRecord } from '../db/outreach.js';
+import { getPersonalization } from '../db/personalization.js';
 import { sendEmail } from '../integrations/email/provider.js';
 
 export async function processOutreachBatch() {
@@ -49,16 +50,36 @@ export async function processOutreachBatch() {
 
     const rendered = renderEmailTemplate('initial', templateData);
 
+    // Prefer the approved AI personalization when the outreach record is linked to one
+    let aiContent = null;
+    if (record.personalization_id) {
+      try {
+        const personalization = await getPersonalization(record.personalization_id);
+        if (personalization && (personalization.status === 'approved' || personalization.status === 'edited')) {
+          aiContent = {
+            subject: personalization.edited_subject || personalization.subject,
+            body: personalization.edited_body || personalization.body,
+          };
+        }
+      } catch (err) {
+        logger.warn(`Could not load personalization ${record.personalization_id}, falling back to template`, { error: err.message });
+      }
+    }
+
+    const finalSubject = aiContent?.subject || rendered.subject;
+    const finalBody = aiContent?.body || rendered.text;
+    const finalHtml = aiContent ? plainTextToHtml(finalBody) : rendered.html;
+
     try {
       // Update status to Sending right before network call
-      await updateOutreachRecord(record.id, { status: 'Sending', subject: rendered.subject, email_body: rendered.html });
+      await updateOutreachRecord(record.id, { status: 'Sending', subject: finalSubject, email_body: finalHtml });
 
       const emailRes = await sendEmail({
         toEmail: contact.email,
         toName: contact.name,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text,
+        subject: finalSubject,
+        html: finalHtml,
+        text: finalBody,
       });
 
       const now = new Date();
@@ -106,4 +127,12 @@ export async function processOutreachBatch() {
 
   logger.info(`[Outreach Job ${jobId}] Run completed. Sent: ${sentCount}, Failed: ${failedCount}`);
   return { claimed: claimedLeads.length, sent: sentCount, failed: failedCount, authStopped };
+}
+
+function plainTextToHtml(text) {
+  if (!text) return '';
+  return text
+    .split(/\n\s*\n/)
+    .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
 }

@@ -38,6 +38,25 @@ export async function createOrUpdateContact(contactData) {
   return data;
 }
 
+export async function approveContactPersonalization(contactId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('contacts')
+    .update({
+      personalization_approved: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', contactId)
+    .select()
+    .single();
+
+  if (error) {
+    logger.error('Error approving contact personalization:', { contactId, error: error.message });
+    throw error;
+  }
+  return data;
+}
+
 export async function markContactSuppressed(email, reason = 'bounced') {
   const supabase = getSupabaseClient();
   const normalized = email.toLowerCase().trim();

@@ -62,6 +62,39 @@ export async function getFollowUpsDue() {
   return data || [];
 }
 
+export async function getOutreachByContactAndCampaign(contactId, campaignId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('outreach')
+    .select('*')
+    .eq('contact_id', contactId)
+    .eq('campaign_id', campaignId)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Error getting outreach by contact/campaign:', { contactId, campaignId, error: error.message });
+    throw error;
+  }
+  return data;
+}
+
+export async function linkPersonalizationToOutreach(contactId, campaignId, personalizationId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('outreach')
+    .update({ personalization_id: personalizationId, updated_at: new Date().toISOString() })
+    .eq('contact_id', contactId)
+    .eq('campaign_id', campaignId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Error linking personalization to outreach:', { contactId, campaignId, error: error.message });
+    throw error;
+  }
+  return data;
+}
+
 export async function updateOutreachRecord(id, fields) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase

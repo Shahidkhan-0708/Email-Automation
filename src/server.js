@@ -1,7 +1,12 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Database & Services
 import { getOrCreateDefaultCampaign } from './db/campaigns.js';
@@ -17,15 +22,28 @@ import { generateAuthUrl, exchangeCodeForTokens, testGmail } from './integration
 import { webhookRouter } from './webhooks/email-events.js';
 import { requireApiKey } from './middleware/api-key.js';
 
+// API Routers
+import { importRouter } from './routes/import.routes.js';
+import { personalizationRouter } from './routes/personalization.routes.js';
+import { dashboardRouter } from './routes/dashboard.routes.js';
+
 // Scheduled Jobs
 import { scheduleOutreachJob } from './jobs/send-outreach.job.js';
 import { scheduleFollowUpJob } from './jobs/followups.job.js';
 import { scheduleReplyCheckJob } from './jobs/replies.job.js';
 import { scheduleAirtableSyncJob } from './jobs/airtable-sync.job.js';
 import { scheduleCleanupStaleClaimsJob } from './jobs/cleanup-stale-claims.job.js';
+import { scheduleImportJob } from './jobs/import.job.js';
+import { schedulePersonalizationJob } from './jobs/personalization.job.js';
 
 const app = express();
 app.use(express.json());
+
+// Serve the built React frontend when available (frontend/dist);
+// otherwise fall back to the legacy static dashboard (public/).
+const reactDist = path.join(__dirname, '..', 'frontend', 'dist');
+const staticRoot = fs.existsSync(reactDist) ? reactDist : path.join(__dirname, '..', 'public');
+app.use(express.static(staticRoot));
 
 // ----------------------------------------------------
 // Health Check Endpoint
@@ -120,6 +138,24 @@ app.get('/unsubscribe', async (req, res) => {
 // Webhooks Router
 // ----------------------------------------------------
 app.use('/webhooks', webhookRouter);
+
+// ----------------------------------------------------
+// API Routers (Import, Personalization, Review, Bulk, Data)
+// ----------------------------------------------------
+app.use('/api', importRouter);
+app.use('/api', personalizationRouter);
+app.use('/api', dashboardRouter);
+
+// ----------------------------------------------------
+// SPA fallback: serve index.html for client-side routes
+// (must come after API/auth/webhook routes)
+// ----------------------------------------------------
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/webhooks') || req.path.startsWith('/health')) {
+    return next();
+  }
+  res.sendFile(path.join(staticRoot, 'index.html'));
+});
 
 // ----------------------------------------------------
 // Secured API Manual Trigger & Helper Endpoints
@@ -219,6 +255,8 @@ scheduleFollowUpJob();
 scheduleReplyCheckJob();
 scheduleAirtableSyncJob();
 scheduleCleanupStaleClaimsJob();
+scheduleImportJob();
+schedulePersonalizationJob();
 
 app.listen(config.port, '0.0.0.0', () => {
   logger.info(`=======================================================`);
