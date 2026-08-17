@@ -39,10 +39,17 @@ import { schedulePersonalizationJob } from './jobs/personalization.job.js';
 const app = express();
 app.use(express.json());
 
-// Serve the built React frontend when available (frontend/dist);
-// otherwise fall back to the legacy static dashboard (public/).
+// Serve the built React frontend when available. Prefer the V2 redesign
+// (f/dist); fall back to the earlier React build (frontend/dist); otherwise
+// fall back to the legacy static dashboard (public/).
+const v2ReactDist = path.join(__dirname, '..', 'f', 'dist');
 const reactDist = path.join(__dirname, '..', 'frontend', 'dist');
-const staticRoot = fs.existsSync(reactDist) ? reactDist : path.join(__dirname, '..', 'public');
+const legacyRoot = path.join(__dirname, '..', 'public');
+const staticRoot = fs.existsSync(v2ReactDist)
+  ? v2ReactDist
+  : fs.existsSync(reactDist)
+    ? reactDist
+    : legacyRoot;
 app.use(express.static(staticRoot));
 
 // ----------------------------------------------------

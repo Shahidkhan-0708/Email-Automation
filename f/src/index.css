@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Nunito+Sans:wght@400;600;700&family=Roboto+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/* Outreach Console — design tokens (from canvas / outreach-console)   */
+/* ------------------------------------------------------------------ */
+
+@theme inline {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Nunito Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, monospace;
+
+  /* surfaces */
+  --color-paper: #ece7e1;     /* page background */
+  --color-surface: #e6e0d8;   /* raised element base */
+  --color-well: #e2dcd3;      /* recessed base */
+
+  /* ink */
+  --color-ink: #4a4239;       /* primary text */
+  --color-ink-soft: #5a5048;  /* secondary text */
+  --color-ink-dim: #6b6258;   /* tertiary text */
+  --color-faint: #a89d91;     /* muted */
+  --color-fainter: #c2b8ab;   /* faintest / borders on paper */
+
+  /* accents */
+  --color-amber: #e8a552;
+  --color-amber-ink: #b8763a;
+  --color-amber-deep: #8a5f22;
+  --color-sage: #7fb069;
+  --color-sage-ink: #4a7a3a;
+  --color-sage-deep: #5f8a4d;
+  --color-sage-bright: #9fd187;
+  --color-blue: #5b7db1;
+  --color-blue-soft: #9db8e0;
+  --color-terra: #c4715a;
+  --color-terra-ink: #9a4a3e;
+
+  /* neumorphic shadow colors */
+  --color-shadow: #d6cfc6;
+  --color-light: #fbf8f4;
+
+  --radius-pill: 999px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+  }
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+  ::selection {
+    background: rgba(232, 165, 82, 0.35);
+  }
+  /* subtle warm scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cfc7bc transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #cfc7bc;
+    border-radius: 8px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Neumorphic utilities (verbatim from the canvas)                     */
+/* ------------------------------------------------------------------ */
+
+.raised {
+  box-shadow: 8px 8px 16px #d6cfc6, -8px -8px 16px #fbf8f4;
+}
+.raised-sm {
+  box-shadow: 5px 5px 11px #d6cfc6, -5px -5px 11px #fbf8f4;
+}
+.recessed {
+  box-shadow: inset 6px 6px 12px #d6cfc6, inset -6px -6px 12px #fbf8f4;
+}
+.recessed-sm {
+  box-shadow: inset 4px 4px 8px #d6cfc6, inset -4px -4px 8px #fbf8f4;
+}
+.dim {
+  box-shadow: 4px 4px 9px #dcd5cc, -4px -4px 9px #f4efe9;
+}
+.glow-amber {
+  box-shadow: inset 4px 4px 9px #cf9145, inset -3px -3px 8px #ffc97e;
+}
+.glow-sage {
+  box-shadow: inset 4px 4px 9px #5f8a4d, inset -3px -3px 8px #9fd187;
+}
+.amber-pocket {
+  box-shadow: inset 6px 6px 12px #d9c49f, inset -6px -6px 12px #fdf6e9;
+  background: #f3e7d2;
+}
+
+/* raised card used across the app */
+.card-n {
+  background: var(--color-paper);
+  box-shadow: 8px 8px 16px #d6cfc6, -8px -8px 16px #fbf8f4;
+}
+
+/* scrim + glass used over the cinematic image bands */
+.scrim {
+  background: linear-gradient(to bottom, rgba(10, 16, 22, 0.45) 0%, rgba(10, 16, 22, 0.55) 45%, rgba(8, 12, 17, 0.92) 100%);
+}
+.glass {
+  background: rgba(20, 28, 34, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion — keyframes from the canvas                                  */
+/* ------------------------------------------------------------------ */
+
+/* amber breathing glow on the "needs attention" node */
+@keyframes amberPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(232, 165, 82, 0.85), 0 0 18px 2px rgba(232, 165, 82, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(232, 165, 82, 1), 0 0 34px 8px rgba(232, 165, 82, 0.5);
+  }
+}
+.amber-node {
+  animation: amberPulse 2.6s ease-in-out infinite;
+}
+
+/* sage live-dot blink */
+@keyframes sageBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.live-dot {
+  animation: sageBlink 1.8s ease-in-out infinite;
+}
+
+/* traveling light along pipeline connectors */
+@keyframes travel {
+  0% { left: 0%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.trav {
+  animation: travel 2.8s linear infinite;
+}
+
+/* pulsing dot (now marker, live status) */
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.55); opacity: 0.5; }
+}
+.pulse-dot {
+  animation: pulseDot 1.9s ease-in-out infinite;
+}
+
+/* pop-in for chain nodes / dials (outBack feel) */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.pop-in {
+  animation: popIn 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* rise-in for stage cards */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: riseIn 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* press bounce (click feedback) */
+@keyframes pressBounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.press-bounce {
+  animation: pressBounce 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* shimmer for skeletons */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #e2dcd3 25%, #ece7e1 50%, #e2dcd3 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* nav hover transition */
+.nav-item {
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+/* dial arc animation */
+.dial-arc {
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* animated bars */
+.bar-grow {
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* number tabular feel */
+.num-tabular {
+  font-variant-numeric: tabular-nums;
+}
