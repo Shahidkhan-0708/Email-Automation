@@ -34,10 +34,10 @@ Before editing files, report:
 ## Project orientation (this repo)
 
 - **Backend**: `src/` — Express (ESM), Supabase is the source of truth, Airtable for dashboard sync, SMTP via Brevo (nodemailer), Gmail OAuth for inbound reply detection, OpenAI for reply classification + personalization, `node-cron` scheduled jobs (`src/jobs/`).
-- **Frontend**: `frontend/` — React 19 + Vite + TypeScript + Tailwind v4 + Radix UI. The built app (`frontend/dist`) is served by Express at `/` with an SPA fallback. A legacy vanilla-JS dashboard lives in `public/` and is used only as a static fallback.
+- **Frontend**: `f/` is the primary app — React 19 + Vite + TypeScript + Tailwind v4 + Radix UI, built to `f/dist` and served by Express at `/` with an SPA fallback (`frontend/dist` and the legacy `public/` dashboard are fallbacks only).
 - **Database**: Supabase tables — `contacts`, `campaigns`, `outreach`, `processed_gmail_messages`, `profiles`, `enrichment_sources`, `enrichment_results`, `profile_enrichment_links`, `personalization_results`, `review_decisions`, `import_jobs`. Migrations live in `db/migrations/`; they must be applied via the Supabase SQL editor (no direct psql access).
 - **API**: all routes under `/api` require the admin key (`x-api-key`) — in dev, `x-bypass-auth: true` also works.
-- **Dev**: `cd frontend && npm run dev` (Vite on :5173, proxies `/api` to :5000). Prod: `npm start` serves the built app on :5000.
+- **Dev**: `cd f && npm run dev` (Vite on :5174, proxies `/api` to :5000). Prod: `npm start` serves the built app on :5000 (rebuild `f/` after frontend changes).
 
 ## Goal alignment
 

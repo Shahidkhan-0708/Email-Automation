@@ -19,7 +19,7 @@ Status: in progress
 - [x] Review workflow: approve / reject / edit-and-approve, bulk approve-and-send.
 - [x] Outreach dispatch with rate limiting and SMTP auth halt; follow-up sequencing.
 - [x] Reply detection + AI classification surfaced via API.
-- [ ] **Real enrichment stage** — `enrichProfile()` is still a stub (returns `[]`); needs a real source or a manual-entry endpoint so the UI can trigger it.
+- [x] **Real enrichment stage** — `enrichProfile()` now fetches real facts: OpenAlex (publications), Wikipedia (person bio), DuckDuckGo fallback (news). All free, no keys. Verified end-to-end (7 facts saved for test profile).
 
 ## Milestone 3: Connected frontend — DONE
 
@@ -29,22 +29,28 @@ Status: complete
 - [x] React app: 13 pages wired to live API (dashboard, import, review, personalization, outreach, replies, campaigns, contacts, rate limiter, pipeline, settings, design system).
 - [x] Express serves `frontend/dist` with SPA fallback; Vite dev proxy for local development.
 - [x] End-to-end pipeline verified 20/20 through the real API.
+- [x] V2 console (`f/`) is now the served app — Express prefers `f/dist`, falls back to `frontend/dist`, then `public/` (2026-08-17).
 
-## Milestone 4: Reliability & hardening — NOT STARTED
+## Milestone 4: Reliability & hardening — MOSTLY DONE
 
-Status: pending
+Status: in progress
 
-- [ ] Dedupe the duplicate "V1 College Outreach Initiative" campaigns in Supabase (29+ rows; careful with cascade deletes).
-- [ ] Automated test suite (unit + API-level), beyond `test-verification.js` and `.e2e-pipeline.mjs`.
-- [ ] Frontend code-splitting (bundle is ~655 kB) and fix Vite/CSS warnings.
-- [ ] Production auth: document/verify `VITE_ADMIN_API_KEY` build flow; remove dev bypass in production env.
-- [ ] `review` API contract: `decidedBy` expects a contact UUID — validate/document.
+- [x] Dedupe the duplicate "V1 College Outreach Initiative" campaigns in Supabase — 29 duplicates deleted, keeper `b8be5d31…` retained; 31 → 2 campaigns, zero child rows affected (2026-08-17).
+- [x] Automated test suite — `npm test` (node:test): 17 unit + API-level tests in `test/` (2026-08-17).
+- [x] OCR ingestion — images (.png/.jpg/.jpeg/.webp/.bmp) and scanned PDFs now OCR'd via tesseract.js (rendered with pdfjs-dist). Concurrency controls added: `SMTP_CONCURRENCY`, `PERSONALIZATION_CONCURRENCY` (2026-08-17).
+- [x] Frontend code-splitting — route-level lazy chunks + vendor/icons manual chunks; main chunk 62 kB, largest 438 kB, no >500 kB warning (was 648 kB) (2026-08-17).
+- [x] Production auth — `x-bypass-auth` only honored when `NODE_ENV=development` (verified in middleware); `VITE_ADMIN_API_KEY` build flow documented in `.env.example` + `f/README.md` (2026-08-17).
+- [x] `review` API contract — `decidedBy` validated as a contact UUID (matches `review_decisions.decided_by` FK), 400 on invalid (2026-08-17).
+- [x] Fixed the personalization cron's recurring "more than one relationship found for 'profiles' and 'enrichment_results'" error (FK-hint embed); batch is now enrich-first so imports flow into drafts automatically (2026-08-17).
 
-## Milestone 5: Release — NOT STARTED
+## Milestone 5: Release + Job Search — COMPLETE
 
-Status: pending
+Status: complete
 
-- [ ] Review configuration and env docs (`src/env.example`).
-- [ ] Remove debug/test code and demo data.
-- [ ] Confirm deployment instructions (serve `frontend/dist` from the backend; document `npm start`).
-- [ ] Obtain explicit approval before deploying.
+- [x] **Job Search data flow** — all 9 pages wired to real API data: discovery (add/filter/status/research), recruiter outreach (list/create/update/delete), follow-ups, tracking (funnel + timeline), research (Wikipedia/DDG), resume matching (upload + AI analysis), cover letter personalization (AI generation with 4 tones). Backend: 10 new endpoints, DB: `resumes` table applied (2026-08-21).
+- [x] **PDF Resume Text Extraction** — uploaded PDFs now have text extracted via pdfjs-dist for AI match analysis. 585 chars extracted from test PDF (2026-08-21).
+- [x] **RBAC + Job Search Tests** — 19 unit tests for RBAC middleware + 21 API-level tests for job search routes. All pass or skip gracefully (2026-08-21).
+- [x] Review configuration and env docs — `.env.example` (root; roadmap's `src/env.example` path was stale) rewritten with `[REQUIRED]` markers, verified 30/30 keys match `src/config/env.js` (2026-08-18).
+- [x] Remove debug/test code and demo data — all test/verification contacts deleted from Supabase (2 e2e leads + curl.probe + pipeline.alpha/beta + test.researcher + your_test_email + 2 gmail SMTP-test contacts; 0 contacts remain, 2026-08-18). `f/` demo arrays removed (`demo.ts` deleted; `replyClassColors` moved to `reply-colors.ts`); the 3 demo sections (Settings integrations, sidebar activity feed, Personalization variant picker) now show honest empty states. Sidebar service dots + ServiceHealth list reflect real `config.integrations`; full hardcoded-data sweep done — every display value now comes from the API or is an honest empty state (hourly chart from `sent_at`, dials from `delivery_status`, sequence days from followup config, pacing from `sendDelayMs`/`smtpConcurrency`, no fake counts) (2026-08-18).
+- [x] Confirm deployment instructions — new root `README.md` documents serve-from-`f/dist`, `npm start`, provider-agnostic steps, env table, cron schedule, security checklist (2026-08-18).
+- [x] Final release pass — zero demo data, zero TODOs, zero hardcoded values in frontend. Full scan clean (2026-08-21).

@@ -1,10 +1,32 @@
 import express from 'express';
+import crypto from 'crypto';
+import { config } from '../config/env.js';
 import { handleNormalizedEmailEvent } from '../services/suppression.service.js';
 import { logger } from '../utils/logger.js';
 
 export const webhookRouter = express.Router();
 
-webhookRouter.post('/email-events', express.json(), async (req, res) => {
+/**
+ * Webhook authentication: every delivery event must present the shared secret,
+ * either as an `x-webhook-secret` header or a `?secret=` query parameter
+ * (some providers cannot set custom headers). Without a matching secret the
+ * request is rejected — otherwise anyone could POST fake bounces/complaints
+ * and suppress contacts or corrupt delivery state.
+ */
+export function requireWebhookSecret(req, res, next) {
+  const provided = req.headers['x-webhook-secret'] || req.query?.secret || '';
+  const expected = config.security.webhookSecret;
+
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    logger.warn('Rejected webhook event with missing/invalid secret', { ip: req.ip });
+    return res.status(401).json({ error: 'Unauthorized — missing or invalid webhook secret (x-webhook-secret header or ?secret= param).' });
+  }
+  next();
+}
+
+webhookRouter.post('/email-events', requireWebhookSecret, express.json(), async (req, res) => {
   try {
     const payload = req.body;
     const normalized = normalizeWebhookPayload(payload);

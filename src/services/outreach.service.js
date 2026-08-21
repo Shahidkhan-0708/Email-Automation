@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { delay } from '../utils/delay.js';
-import { renderEmailTemplate } from '../utils/template-engine.js';
+import { mapWithConcurrency } from '../utils/pool.js';
 import { claimReadyLeads, updateOutreachRecord } from '../db/outreach.js';
 import { getPersonalization } from '../db/personalization.js';
 import { sendEmail } from '../integrations/email/provider.js';
@@ -25,32 +25,24 @@ export async function processOutreachBatch() {
   let failedCount = 0;
   let authStopped = false;
 
-  for (let i = 0; i < claimedLeads.length; i++) {
-    if (authStopped) break;
+  const concurrency = Math.max(1, config.outreach.smtpConcurrency);
+  await mapWithConcurrency(claimedLeads, concurrency, async (record) => {
+    if (authStopped) return; // halt remaining sends after an auth failure
 
-    const record = claimedLeads[i];
     const contact = record.contacts;
 
     if (!contact || contact.do_not_contact || contact.suppressed) {
       logger.warn(`Skipping claimed record ${record.id} - contact suppressed or do not contact.`);
       await updateOutreachRecord(record.id, { status: 'Closed', error_message: 'Contact suppressed' });
-      continue;
+      return;
     }
 
-    const firstName = (contact.name || '').split(' ')[0] || contact.name;
-    const templateData = {
-      contactId: contact.id,
-      firstName,
-      organization: contact.organization,
-      role: contact.role,
-      personalization: contact.personalization,
-      senderName: config.smtp.fromName,
-      subject: `Connecting with ${contact.name} - University Initiative`,
-    };
-
-    const rendered = renderEmailTemplate('initial', templateData);
-
-    // Prefer the approved AI personalization when the outreach record is linked to one
+    // Strict pipeline: a send REQUIRES an approved/edited personalization.
+    // The generic template is intentionally never sent to a real recipient:
+    // the whole product point is evidence-cited, human-approved outreach, and
+    // claimReadyLeads already excludes records without one. This check is
+    // defense-in-depth for the race where the draft is rejected between the
+    // claim and the send — such records are parked as Error, never sent.
     let aiContent = null;
     if (record.personalization_id) {
       try {
@@ -62,13 +54,21 @@ export async function processOutreachBatch() {
           };
         }
       } catch (err) {
-        logger.warn(`Could not load personalization ${record.personalization_id}, falling back to template`, { error: err.message });
+        logger.warn(`Could not load personalization ${record.personalization_id}`, { error: err.message });
       }
     }
+    if (!aiContent) {
+      await updateOutreachRecord(record.id, {
+        status: 'Error',
+        error_message: 'No approved personalization linked — template fallback is disabled (pipeline enforcement)',
+        error_category: 'pipeline',
+      });
+      return;
+    }
 
-    const finalSubject = aiContent?.subject || rendered.subject;
-    const finalBody = aiContent?.body || rendered.text;
-    const finalHtml = aiContent ? plainTextToHtml(finalBody) : rendered.html;
+    const finalSubject = aiContent.subject;
+    const finalBody = aiContent.body;
+    const finalHtml = plainTextToHtml(finalBody);
 
     try {
       // Update status to Sending right before network call
@@ -97,7 +97,12 @@ export async function processOutreachBatch() {
       });
 
       sentCount++;
-      logger.info(`[Outreach Job ${jobId}] Sent initial email to ${contact.email} (${i + 1}/${claimedLeads.length})`);
+      logger.info(`[Outreach Job ${jobId}] Sent initial email to ${contact.email}`);
+
+      // Pace sends even under concurrency: each worker waits before its next send.
+      if (config.outreach.sendDelayMs > 0) {
+        await delay(config.outreach.sendDelayMs);
+      }
     } catch (err) {
       failedCount++;
       const category = err.category || 'provider_error';
@@ -107,7 +112,7 @@ export async function processOutreachBatch() {
         logger.error('CRITICAL: Authentication failed with SMTP provider. Halting outreach job immediately!');
         authStopped = true;
         await updateOutreachRecord(record.id, { status: 'Error', error_message: err.message, error_category: category });
-        break;
+        return;
       }
 
       if (category === 'invalid_email') {
@@ -119,11 +124,7 @@ export async function processOutreachBatch() {
         await updateOutreachRecord(record.id, { status: 'Error', error_message: err.message, error_category: category });
       }
     }
-
-    if (i < claimedLeads.length - 1 && config.outreach.sendDelayMs > 0) {
-      await delay(config.outreach.sendDelayMs);
-    }
-  }
+  });
 
   logger.info(`[Outreach Job ${jobId}] Run completed. Sent: ${sentCount}, Failed: ${failedCount}`);
   return { claimed: claimedLeads.length, sent: sentCount, failed: failedCount, authStopped };

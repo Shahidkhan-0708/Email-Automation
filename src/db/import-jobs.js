@@ -1,7 +1,9 @@
 import { getSupabaseClient } from './client.js';
 import { logger } from '../utils/logger.js';
 
-const VALID_TYPES = ['pdf', 'xlsx', 'csv'];
+// 'image' covers OCR'd uploads (.png/.jpg/.jpeg/.webp/.bmp) — the import route
+// resolves those to fileType 'image' before queueing.
+const VALID_TYPES = ['pdf', 'xlsx', 'csv', 'image'];
 
 export async function createImportJob({ filename, fileType, fileData }) {
   if (!VALID_TYPES.includes(fileType)) {
@@ -74,6 +76,37 @@ export async function getNextQueuedImportJob() {
     throw error;
   }
   return data;
+}
+
+/**
+ * Recover import jobs stuck in 'processing' (e.g. the process crashed mid-run).
+ * Jobs older than `timeoutMinutes` are moved back to 'queued' so the cron can
+ * retry them — contacts/profile/outreach writes are idempotent, so re-running
+ * is safe. Returns the number of jobs recovered.
+ */
+export async function recoverStaleImportJobs(timeoutMinutes = 10) {
+  const supabase = getSupabaseClient();
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('import_jobs')
+    .update({
+      status: 'queued',
+      error_message: 'Recovered: previous run was interrupted; will retry.',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('status', 'processing')
+    .lte('updated_at', cutoff)
+    .select('id');
+
+  if (error) {
+    logger.error('Error recovering stale import jobs:', { error: error.message });
+    return 0;
+  }
+  if (data && data.length > 0) {
+    logger.info(`Recovered ${data.length} stale import job(s) back to queued`);
+  }
+  return data ? data.length : 0;
 }
 
 export async function listImportJobs(limit = 20) {

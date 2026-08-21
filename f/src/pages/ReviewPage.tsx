@@ -9,24 +9,22 @@ import { Card, SectionTitle, MonoLabel, Avatar, ScoreChip, Badge, EmptyState, Lo
 
 interface EvidenceChip {
   label: string
-  confidence: number
+  confidence: number | null
 }
 
 function evidenceOf(p: Personalization): EvidenceChip[] {
   const raw = Array.isArray(p.evidence_used) ? p.evidence_used : []
   if (raw.length === 0) {
-    // placeholder evidence until the backend returns richer structures
-    return [
-      { label: 'Publication match', confidence: 0.92 },
-      { label: 'Profile signal', confidence: 0.88 },
-    ]
+    return []
   }
   return raw.slice(0, 4).map((e, i) => {
-    if (typeof e === 'string') return { label: e, confidence: Math.max(0.6, 0.94 - i * 0.04) }
+    if (typeof e === 'string') return { label: e, confidence: null }
     const o = e as Record<string, unknown>
     return {
-      label: String(o.label ?? o.title ?? o.source ?? `Evidence ${i + 1}`),
-      confidence: typeof o.confidence === 'number' ? o.confidence : Math.max(0.6, 0.94 - i * 0.04),
+      // relationship (publication/bio/news) reads better than raw source ids.
+      label: String(o.relationship ?? o.label ?? o.title ?? o.source ?? `Evidence ${i + 1}`),
+      // null when no confidence recorded for this fact — shown as "—".
+      confidence: typeof o.confidence === 'number' ? o.confidence : null,
     }
   })
 }
@@ -47,6 +45,8 @@ export const ReviewPage: React.FC = () => {
   const [body, setBody] = useState('')
 
   const current = reviewQueue[index] ?? null
+  const confidence = current ? confidenceOf(current) : null
+  const needsHuman = confidence != null && confidence < 0.8
 
   useEffect(() => setIndex(i => Math.min(i, Math.max(0, reviewQueue.length - 1))), [reviewQueue.length])
   useEffect(() => {
@@ -137,11 +137,13 @@ export const ReviewPage: React.FC = () => {
           <EmptyState title="Queue is clear" hint="Approve or reject drafts as they land. Keyboard: J next · K previous · A approve · R reject." />
         </Card>
       ) : (
-        <div className="grid grid-cols-[300px_1fr] gap-7 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-7 items-start">
           {/* queue rail */}
           <RiseIn delay={80}>
             <Card className="p-4 flex flex-col gap-1 max-h-[600px] overflow-y-auto">
-              {reviewQueue.map((p, i) => (
+              {reviewQueue.map((p, i) => {
+                const c = confidenceOf(p)
+                return (
                 <button
                   key={p.id}
                   onClick={() => setIndex(i)}
@@ -153,7 +155,7 @@ export const ReviewPage: React.FC = () => {
                   <Avatar
                     initials={initialsOf(contactNameOf(p))}
                     size="w-9 h-9 rounded-[12px] text-[10px]"
-                    tone={confidenceOf(p) < 0.8 ? 'terra' : 'default'}
+                    tone={c != null && c < 0.8 ? 'terra' : 'default'}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] font-semibold text-ink truncate">{contactNameOf(p)}</p>
@@ -161,7 +163,8 @@ export const ReviewPage: React.FC = () => {
                   </div>
                   <span className="font-mono text-[10px] text-faint">{i + 1}</span>
                 </button>
-              ))}
+                )
+              })}
             </Card>
           </RiseIn>
 
@@ -172,7 +175,7 @@ export const ReviewPage: React.FC = () => {
                 <>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <Avatar initials={initialsOf(contactName)} size="w-14 h-14 rounded-[18px] text-[14px]" tone={confidenceOf(current) < 0.8 ? 'terra' : 'default'} />
+                      <Avatar initials={initialsOf(contactName)} size="w-14 h-14 rounded-[18px] text-[14px]" tone={needsHuman ? 'terra' : 'default'} />
                       <div>
                         <p className="font-display text-[20px] text-ink leading-tight">{contactName}</p>
                         <p className="text-[13px] text-faint">{org}</p>
@@ -182,25 +185,29 @@ export const ReviewPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <ScoreChip score={confidenceOf(current)} className="text-[13px] px-3 py-1.5" />
-                      {confidenceOf(current) < 0.8 && <Badge tone="terra">needs human</Badge>}
+                      <ScoreChip score={confidence} className="text-[13px] px-3 py-1.5" />
+                      {needsHuman && <Badge tone="terra">needs human</Badge>}
                     </div>
                   </div>
 
                   {/* evidence */}
                   <div>
                     <MonoLabel className="mb-2">Evidence</MonoLabel>
-                    <div className="flex flex-wrap gap-2">
-                      {evidenceOf(current).map((e, i) => (
-                        <span
-                          key={i}
-                          className="recessed-sm rounded-[999px] px-3 py-1.5 font-mono text-[10.5px] text-ink-dim flex items-center gap-2"
-                        >
-                          {e.label}
-                          <span className="text-amber-ink">{e.confidence.toFixed(2)}</span>
-                        </span>
-                      ))}
-                    </div>
+                    {evidenceOf(current).length === 0 ? (
+                      <p className="font-mono text-[11px] text-faint">No evidence recorded for this draft.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {evidenceOf(current).map((e, i) => (
+                          <span
+                            key={i}
+                            className="recessed-sm rounded-[999px] px-3 py-1.5 font-mono text-[10.5px] text-ink-dim flex items-center gap-2"
+                          >
+                            {e.label}
+                            <span className="text-amber-ink">{e.confidence != null ? e.confidence.toFixed(2) : '—'}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* draft */}

@@ -4,11 +4,12 @@ import { logger } from '../utils/logger.js';
 import { getSupabaseClient } from '../db/client.js';
 import { getProfile } from '../db/profiles.js';
 import { getEnrichmentResults } from '../db/enrichment.js';
+import { runResearchSynchronously } from './research.service.js';
 import { getOrCreateDefaultCampaign } from '../db/campaigns.js';
 import {
   savePersonalization,
   getPersonalization,
-  getPersonalizationByProfileAndCampaign,
+  supersedePendingPersonalizations,
   listPersonalizations,
   updatePersonalizationStatus,
   addReviewDecision,
@@ -18,8 +19,11 @@ import {
 } from '../db/personalization.js';
 import { linkPersonalizationToOutreach } from '../db/outreach.js';
 import { approveContactPersonalization } from '../db/contacts.js';
+import { mapWithConcurrency } from '../utils/pool.js';
 
 const VALID_DECISIONS = ['approved', 'rejected', 'edited'];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ------------------------------------------------------------
 // Generation
@@ -32,6 +36,26 @@ export async function generatePersonalizedEmail(profileId, campaignId) {
     campaignId ? getCampaign(campaignId) : getOrCreateDefaultCampaign(),
   ]);
 
+  // --- Evidence gate: refuse to generate when no high-confidence facts exist. --
+  // Without evidence the AI fabricates plausible-sounding claims about the
+  // person based solely on their role title, which violates the product promise
+  // of evidence-cited, human-reviewed outreach. The caller (batch job or manual
+  // API) gets a clear error and can retry after enrichment succeeds.
+  const usableFacts = (enrichments || []).filter(
+    e => e.confidence == null || e.confidence >= MIN_PROMPT_EVIDENCE_CONFIDENCE
+  );
+  if (usableFacts.length === 0) {
+    throw new Error(
+      `Generation blocked: profile ${profileId} has no enrichment facts above the ` +
+      `${Math.round(MIN_PROMPT_EVIDENCE_CONFIDENCE * 100)}% confidence threshold. ` +
+      `Run research first or add enrichment facts manually.`
+    );
+  }
+
+  // One pending draft per profile+campaign: supersede any older pending rows
+  // so the review queue never holds stale duplicates for the same person.
+  await supersedePendingPersonalizations(profileId, campaign.id);
+
   const prompt = buildPrompt(profile, enrichments, campaign, config.smtp);
   const result = await callOpenAI(prompt);
 
@@ -40,34 +64,36 @@ export async function generatePersonalizedEmail(profileId, campaignId) {
     campaignId: campaign.id,
     subject: result.subject || '',
     body: result.body || '',
-    evidenceUsed: normalizeEvidence(result.evidencesUsed || result.evidenceUsed || []),
+    // Evidence is validated against the profile's real enrichment rows: ids the
+    // model invented (not traceable to a fact) are dropped, and every kept item
+    // carries the real source/url/relationship so the trace is auditable.
+    evidenceUsed: sanitizeEvidence(result.evidencesUsed || result.evidenceUsed || [], enrichments),
     aiModel: config.ai.model,
     generationPrompt: prompt,
     status: 'pending_review',
   };
 
+  // --- Post-generation evidence validation ---
+  // If usable facts existed but the AI cited none, the output is unreliable.
+  // The model may have ignored the facts and fabricated claims from the profile
+  // fields alone. Reject and let the caller retry or the operator investigate.
+  if (personalization.evidenceUsed.length === 0 && usableFacts.length > 0) {
+    throw new Error(
+      `Generation rejected: AI cited 0 of ${usableFacts.length} available facts. ` +
+      `The model may have fabricated claims. Retry or review the prompt.`
+    );
+  }
+
   const saved = await savePersonalization(personalization);
-  logger.info(`Generated personalization ${saved.id} for profile ${profileId}`);
+  logger.info(`Generated personalization ${saved.id} for profile ${profileId} (${personalization.evidenceUsed.length} cited facts)`);
   return saved;
 }
 
 export async function regeneratePersonalization(profileId, campaignId) {
-  const campaign = campaignId ? await getCampaign(campaignId) : await getOrCreateDefaultCampaign();
-  const existing = await getPersonalizationByProfileAndCampaign(profileId, campaign.id);
-
-  // Remove the old pending row so a fresh one can be created for this profile/campaign.
-  // (personalization_results has no unique constraint on profile+campaign, so the
-  // "latest" row is what review/send picks up.)
-  if (existing && existing.status === 'pending_review') {
-    await updatePersonalizationStatus(existing.id, { status: 'rejected' });
-    await addReviewDecision({
-      personalizationId: existing.id,
-      decision: 'rejected',
-      comments: 'Superseded by regeneration',
-    });
-  }
-
-  return generatePersonalizedEmail(profileId, campaign.id);
+  // Superseding (rejecting) any existing pending draft happens inside
+  // generatePersonalizedEmail, so regeneration always yields exactly one
+  // fresh pending draft and the old one leaves the review queue.
+  return generatePersonalizedEmail(profileId, campaignId);
 }
 
 // ------------------------------------------------------------
@@ -77,6 +103,13 @@ export async function regeneratePersonalization(profileId, campaignId) {
 export async function submitReviewDecision(personalizationId, decision, { comments, editedSubject, editedBody, decidedBy } = {}) {
   if (!VALID_DECISIONS.includes(decision)) {
     throw new Error(`Invalid decision '${decision}'. Must be one of: ${VALID_DECISIONS.join(', ')}`);
+  }
+
+  // decidedBy maps to review_decisions.decided_by, which is a FK to contacts(id).
+  // Accept an empty value, but if provided it must be a contact UUID — otherwise
+  // the DB would reject the row with a confusing 500.
+  if (decidedBy != null && decidedBy !== '' && !UUID_RE.test(decidedBy)) {
+    throw new Error(`Invalid decidedBy '${decidedBy}'. Must be a contact UUID (see review_decisions.decided_by FK).`);
   }
 
   const personalization = await getPersonalization(personalizationId);
@@ -169,10 +202,19 @@ export async function getProgress(campaignId) {
 export async function processPendingPersonalizations(campaignId, limit = 20) {
   const campaign = campaignId ? await getCampaign(campaignId) : await getOrCreateDefaultCampaign();
   const readyProfiles = await getProfilesReadyForPersonalization(campaign.id, limit);
+  const concurrency = config.processing.personalizationConcurrency;
 
-  const results = { generated: 0, failed: 0, errors: [] };
-  for (const profile of readyProfiles) {
+  const results = { enriched: 0, generated: 0, failed: 0, errors: [] };
+  await mapWithConcurrency(readyProfiles, concurrency, async (profile) => {
     try {
+      // Research-first: imports land without evidence. Run the research engine
+      // (discovery -> identity match -> evidence) when the profile has no
+      // facts yet, so the AI only ever cites real, sourced evidence.
+      const enrichments = await getEnrichmentResults(profile.id);
+      if (enrichments.length === 0) {
+        await runResearchSynchronously(profile.id);
+        results.enriched += 1;
+      }
       await generatePersonalizedEmail(profile.id, campaign.id);
       results.generated += 1;
     } catch (err) {
@@ -180,9 +222,9 @@ export async function processPendingPersonalizations(campaignId, limit = 20) {
       results.errors.push({ profileId: profile.id, error: err.message });
       logger.error(`Personalization generation failed for profile ${profile.id}:`, { error: err.message });
     }
-  }
+  });
 
-  logger.info(`Personalization batch complete. Generated: ${results.generated}, Failed: ${results.failed}`);
+  logger.info(`Personalization batch complete (concurrency ${concurrency}). Enriched: ${results.enriched}, Generated: ${results.generated}, Failed: ${results.failed}`);
   return results;
 }
 
@@ -232,12 +274,20 @@ async function getSentCount(campaignId) {
   return count || 0;
 }
 
+// Evidence below this confidence never reaches the prompt — weak matches must
+// not influence generated email. Manual facts (confidence null) are kept: they
+// were entered by a human.
+const MIN_PROMPT_EVIDENCE_CONFIDENCE = 0.5;
+
 export function buildPrompt(profile, enrichments, campaign, senderInfo) {
   const factsForPrompt = (enrichments || [])
+    .filter(e => e.confidence == null || e.confidence >= MIN_PROMPT_EVIDENCE_CONFIDENCE)
     .map(e => {
       const confidencePercent = Math.round((e.confidence || 0) * 100);
       const verified = e.verified ? 'Verified' : 'Unverified';
-      return `- ${e.relationship}: "${e.fact_value}" (Source: ${e.source_id || 'Manual'}, Confidence: ${confidencePercent}%, Status: ${verified})`;
+      // Fact ID is the enrichment_result UUID — the model must echo it back in
+      // evidencesUsed so generated evidence is traceable to a real fact.
+      return `- ${e.relationship}: "${e.fact_value}" (Fact ID: ${e.id}, Source: ${e.source_id || 'Manual'}, Confidence: ${confidencePercent}%, Status: ${verified})`;
     })
     .join('\n');
 
@@ -298,13 +348,29 @@ export function buildEvidenceTrace(evidenceUsed) {
   }));
 }
 
-function normalizeEvidence(evidence) {
-  return evidence.map(f => ({
-    id: f.id || f.factId || null,
-    source: f.source || null,
-    confidence: f.confidence != null ? f.confidence : null,
-    usage: f.usage || null,
-  }));
+/**
+ * Keep only evidence the model actually cited that maps to a real enrichment
+ * fact of THIS profile, decorated with the fact's own source/url/relationship.
+ * Anything else (invented ids like "publication-1" or "persona_profile") is
+ * dropped — untraceable evidence must never be presented as real.
+ */
+export function sanitizeEvidence(evidence, enrichments) {
+  const byId = new Map((enrichments || []).map(e => [e.id, e]));
+  const cleaned = [];
+  for (const item of evidence || []) {
+    const fact = byId.get(item.id) || byId.get(item.factId);
+    if (!fact) continue;
+    cleaned.push({
+      id: fact.id,
+      source: fact.source_id || null,
+      sourceUrl: fact.source_url || null,
+      relationship: fact.relationship || null,
+      confidence: typeof item.confidence === 'number' ? item.confidence : (fact.confidence ?? null),
+      usage: item.usage || 'cited fact',
+      factValue: typeof fact.fact_value === 'string' ? fact.fact_value : JSON.stringify(fact.fact_value ?? ''),
+    });
+  }
+  return cleaned;
 }
 
 async function callOpenAI(prompt) {

@@ -15,6 +15,15 @@ function getAirtableBase() {
   return airtableBase;
 }
 
+const APPLICATION_ID_FIELD = 'Application ID';
+const BATCH_SIZE = 10;
+
+/**
+ * Idempotent sync: outreach rows are keyed on Airtable by their 'Application ID'
+ * (the Supabase outreach UUID). Existing Airtable records are updated in place;
+ * only genuinely new rows are created — re-running this job (cron every 30 min,
+ * manual triggers, or overlapping runs) never accumulates duplicates.
+ */
 export async function syncSupabaseToAirtable() {
   const base = getAirtableBase();
   if (!base) {
@@ -23,41 +32,74 @@ export async function syncSupabaseToAirtable() {
   }
 
   const supabase = getSupabaseClient();
-  
-  // Fetch outreach records updated recently or marked for sync
+
   const { data: records, error } = await supabase
     .from('outreach')
     .select('*, contacts(*)');
 
-  if (error || !records || records.length === 0) return;
+  if (error || !records || records.length === 0) {
+    if (error) logger.error('Error fetching outreach for Airtable sync:', { error: error.message });
+    return;
+  }
 
   const table = base(config.airtable.tableName);
 
-  // Group into batches of 10 for Airtable API quota safety
-  for (let i = 0; i < records.length; i += 10) {
-    const chunk = records.slice(i, i + 10);
-    const airtableRecords = chunk.map((r) => {
-      const fields = {
-        'Name': r.contacts?.name || r.id,
-        'Email': r.contacts?.email || '',
-      };
+  // Build applicationId -> Airtable record id map from existing rows.
+  const existingByAppId = new Map();
+  try {
+    const existing = await table.select({
+      fields: [APPLICATION_ID_FIELD],
+      pageSize: BATCH_SIZE,
+    }).all();
+    for (const rec of existing) {
+      const appId = rec.fields[APPLICATION_ID_FIELD];
+      if (appId && !existingByAppId.has(appId)) existingByAppId.set(String(appId), rec.id);
+    }
+  } catch (err) {
+    logger.error('Error reading existing Airtable records:', { error: err.message });
+    return;
+  }
 
-      if (r.contacts?.name) fields['Applicant Name'] = r.contacts.name;
-      if (r.id) fields['Application ID'] = r.id;
-      if (r.ai_summary || r.ai_category) {
-        fields['Notes'] = `[${r.ai_category || 'REPLIED'}] ${r.ai_summary || ''} -> Next Action: ${r.ai_next_action || ''}`;
-      }
+  const toCreate = [];
+  const toUpdate = [];
+  for (const r of records) {
+    const fields = buildFields(r);
+    const airtableId = existingByAppId.get(r.id);
+    if (airtableId) toUpdate.push({ id: airtableId, fields });
+    else toCreate.push({ fields });
+  }
 
-      return { fields };
-    });
-
+  // Group into batches of 10 for Airtable API quota safety.
+  for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
     try {
-      // Upsert into Airtable
-      await table.create(airtableRecords);
+      await table.create(toCreate.slice(i, i + BATCH_SIZE));
     } catch (err) {
-      logger.error(`Error syncing chunk to Airtable: ${err.message}`, { error: err });
+      logger.error(`Error creating Airtable chunk: ${err.message}`, { error: err });
     }
   }
 
-  logger.info(`Synced ${records.length} records to Airtable dashboard.`);
+  for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
+    try {
+      await table.update(toUpdate.slice(i, i + BATCH_SIZE));
+    } catch (err) {
+      logger.error(`Error updating Airtable chunk: ${err.message}`, { error: err });
+    }
+  }
+
+  logger.info(`Synced ${records.length} records to Airtable dashboard. Created: ${toCreate.length}, Updated: ${toUpdate.length}`);
+}
+
+function buildFields(r) {
+  const fields = {
+    'Name': r.contacts?.name || r.id,
+    'Email': r.contacts?.email || '',
+  };
+
+  if (r.contacts?.name) fields['Applicant Name'] = r.contacts.name;
+  if (r.id) fields[APPLICATION_ID_FIELD] = r.id;
+  if (r.ai_summary || r.ai_category) {
+    fields['Notes'] = `[${r.ai_category || 'REPLIED'}] ${r.ai_summary || ''} -> Next Action: ${r.ai_next_action || ''}`;
+  }
+
+  return fields;
 }

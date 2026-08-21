@@ -16,6 +16,18 @@ Consequences: `npm run build` in `frontend/` is required before `npm start` serv
 
 ---
 
+### 2026-08-17 — V2 console (`f/`) is the primary frontend
+
+Context: A redesigned "Outreach Console V2" React app in `f/` (custom design system, dedicated person/campaign detail + bulk-send pages, same API layer as `frontend/`) was built but unserved and untracked.
+
+Decision: Express now prefers `f/dist`, falling back to `frontend/dist`, then legacy `public/`. `f/` is committed. The 4 demo-data spots in `f/` (Research page, Settings integrations list, sidebar activity feed, Personalization variant picker) stay for now, flagged with TODOs, until their backend endpoints exist.
+
+Reason: `f/` is the intended V2 direction — more real pages and a polished design system with zero data-layer rework (identical `AppContext`/`api.ts`).
+
+Consequences: `npm run build` in `f/` is required before `npm start` serves the V2 UI. `frontend/` is kept as fallback; delete only with explicit approval. Bundle ~648 kB still needs code-splitting (M4).
+
+---
+
 ### 2026-08-15 — Default campaign lookup must be deterministic
 
 Context: `getOrCreateDefaultCampaign()` queried by non-unique `name` with `.maybeSingle()`, which errors when multiple rows match on this PostgREST setup; the code then fell through and inserted a new duplicate campaign on every call (29+ duplicates accumulated).
@@ -61,6 +73,18 @@ Decision: New `src/routes/dashboard.routes.js` mounted at `/api` holds all read-
 Reason: Follows the existing router-per-concern convention.
 
 Consequences: Adding a new read endpoint goes in `dashboard.routes.js`.
+
+---
+
+### 2026-08-20 — RBAC + module/workspace isolation
+
+Context: The system needed to support two distinct products (Outreach + Job Search) with different access levels per user.
+
+Decision: Implemented RBAC with a `user_profiles` table storing `role`, `enabled_modules`, and `active_workspace`. Backend `requireModule()` middleware gates routes by module. Frontend `UserProfileContext` + `ModuleGuard` components enforce visibility. First signup gets `owner` role (both modules); subsequent users get `college_operator` (outreach only). Owner bypasses all module checks.
+
+Reason: Enables multi-product architecture without data leakage — college users cannot access job search API routes even by typing the URL.
+
+Consequences: New migrations required (`user_profiles`, `jobs`, `applications`, `recruiter_outreach`). All existing routes are now behind `requireModule('outreach')`. Job Search routes are scaffolded but need real data flow.
 
 ---
 

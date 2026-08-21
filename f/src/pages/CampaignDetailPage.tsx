@@ -5,17 +5,22 @@ import { useApp } from '@/lib/AppContext'
 import { RiseIn, CountUp } from '@/components/motion'
 import { Card, SectionTitle, MonoLabel, Badge, EmptyState, Avatar, LoadingState, initialsOf } from '@/components/ui'
 
-const SEQUENCE = [
-  { step: 'Email 1', label: 'Personalized intro', wait: 'Day 0', tone: 'sage' as const },
-  { step: 'Follow-up 1', label: 'Gentle nudge', wait: 'Day +4', tone: 'amber' as const },
-  { step: 'Follow-up 2', label: 'Last attempt', wait: 'Day +9', tone: 'amber' as const },
-  { step: 'Close', label: 'Auto-close if no reply', wait: 'Day +14', tone: 'terra' as const },
-]
-
 export const CampaignDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { campaigns, outreach, loading, stats } = useApp()
+
+  // Follow-up cadence from real backend config (FOLLOWUP_1_DAYS / FOLLOWUP_2_DAYS).
+  const f1 = stats?.config.followup1Days ?? 7
+  const f2 = stats?.config.followup2Days ?? 14
+  // Backend cadence (followup.service.js): Email 1 → FU1 at +f1 → FU2 at
+  // +f1+f2 (interval f2 after FU1) → auto-close.
+  const SEQUENCE = [
+    { step: 'Email 1', label: 'Personalized intro', wait: 'Day 0', tone: 'sage' as const },
+    { step: 'Follow-up 1', label: 'Gentle nudge', wait: `Day +${f1}`, tone: 'amber' as const },
+    { step: 'Follow-up 2', label: 'Last attempt', wait: `Day +${f1 + f2}`, tone: 'amber' as const },
+    { step: 'Close', label: 'Auto-close if no reply', wait: `After +${f1 + f2}`, tone: 'terra' as const },
+  ]
 
   const campaign = useMemo(() => campaigns.find(c => c.id === id), [campaigns, id])
   const rows = useMemo(() => outreach.filter(o => o.campaign_id === id).slice(0, 10), [outreach, id])
@@ -51,7 +56,7 @@ export const CampaignDetailPage: React.FC = () => {
         </div>
       </RiseIn>
 
-      <div className="grid grid-cols-[1fr_360px] gap-7 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7 items-start">
         <div className="flex flex-col gap-7">
           <RiseIn delay={60}>
             <Card>

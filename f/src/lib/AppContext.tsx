@@ -9,6 +9,7 @@ import type {
   Profile,
   ReplyRow,
   OutreachRow,
+  IntegrationHealth,
 } from './api';
 import {
   getCampaigns,
@@ -20,6 +21,7 @@ import {
   getImportJobs,
   getReviewQueue,
   getBulkProgress,
+  getIntegrationHealth,
   uploadImport,
   processImport,
   submitReview,
@@ -36,6 +38,7 @@ interface AppContextType {
   error: string | null;
   // data
   stats: DashboardStats | null;
+  health: Record<string, IntegrationHealth> | null;
   campaigns: Campaign[];
   contacts: Contact[];
   outreach: OutreachRow[];
@@ -68,6 +71,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [health, setHealth] = useState<Record<string, IntegrationHealth> | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [outreach, setOutreach] = useState<OutreachRow[]>([]);
@@ -80,28 +84,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const refresh = useCallback(async () => {
     try {
-      const [s, c, co, o, r, p, j, q, bp] = await Promise.all([
-        getStats(),
-        getCampaigns(),
-        getContacts({ limit: 200 }),
-        getOutreach({ limit: 200 }),
-        getReplies(100),
-        getProfiles(200),
-        getImportJobs(20),
-        getReviewQueue(undefined, 50),
-        getBulkProgress(),
-      ]);
-      setStats(s);
-      setCampaigns(c);
-      setContacts(co);
-      setOutreach(o);
-      setReplies(r);
-      setProfiles(p);
-      setImportJobs(j);
-      setReviewQueue(q);
-      setBulkProgress(bp);
-      setSelectedCampaign(prev => prev || (c[0]?.id ?? ''));
-      setError(null);
+      // Use allSettled so one failed endpoint doesn't kill all the others.
+      const [statsR, healthR, campsR, contactsR, outreachR, repliesR, profilesR, jobsR, reviewR, bulkR] =
+        await Promise.allSettled([
+          getStats(),
+          getIntegrationHealth(),
+          getCampaigns(),
+          getContacts({ limit: 200 }),
+          getOutreach({ limit: 200 }),
+          getReplies(100),
+          getProfiles(200),
+          getImportJobs(20),
+          getReviewQueue(undefined, 50),
+          getBulkProgress(),
+        ]);
+
+      const ok = <T,>(r: PromiseSettledResult<T>): T | null =>
+        r.status === 'fulfilled' ? r.value : null;
+
+      const s = ok(statsR);
+      const h = ok(healthR);
+      const c = ok(campsR);
+      const co = ok(contactsR);
+      const o = ok(outreachR);
+      const r = ok(repliesR);
+      const p = ok(profilesR);
+      const j = ok(jobsR);
+      const q = ok(reviewR);
+      const bp = ok(bulkR);
+
+      if (s) setStats(s);
+      if (h) setHealth(h);
+      if (c) setCampaigns(c);
+      if (co) setContacts(co);
+      if (o) setOutreach(o);
+      if (r) setReplies(r);
+      if (p) setProfiles(p);
+      if (j) setImportJobs(j);
+      if (q) setReviewQueue(q);
+      if (bp !== null) setBulkProgress(bp);
+      if (c) setSelectedCampaign(prev => prev || (c[0]?.id ?? ''));
+
+      // Collect errors from failed calls
+      const failures = [statsR, healthR, campsR, contactsR, outreachR, repliesR, profilesR, jobsR, reviewR, bulkR]
+        .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+        .map(r => (r.reason as Error)?.message || 'unknown error');
+      if (failures.length > 0) {
+        setError(`Some data failed to load: ${failures.join('; ')}`);
+      } else {
+        setError(null);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -147,6 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await submitReview(id, 'rejected', { comments });
     toast.success('Personalization rejected');
     await refreshReviewQueue();
+    await refresh(); // keep sidebar queue badge + approve-and-send count in sync
   };
 
   const generateForProfile = async (profileId: string) => {
@@ -201,6 +234,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loading,
         error,
         stats,
+        health,
         campaigns,
         contacts,
         outreach,

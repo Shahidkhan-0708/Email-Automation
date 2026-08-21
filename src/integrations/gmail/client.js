@@ -76,6 +76,7 @@ export async function getRecentReplies(afterTimestampDate = null) {
       const dateHeader = headers.find(h => h.name.toLowerCase() === 'date')?.value || '';
 
       const senderEmail = extractEmailAddress(fromHeader);
+      const inReplyTo = headers.find(h => h.name.toLowerCase() === 'in-reply-to')?.value || '';
       const bodyText = extractPlainTextBody(messageData.payload);
 
       replyDetails.push({
@@ -86,6 +87,7 @@ export async function getRecentReplies(afterTimestampDate = null) {
         subject: subjectHeader,
         receivedAt: dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString(),
         body: bodyText,
+        inReplyTo,
       });
     }
 
@@ -125,7 +127,7 @@ export async function testGmail(req, res) {
     });
 
   } catch (error) {
-    console.error(error);
+    logger.error('Gmail API test failed:', { error: error.message });
 
     res.status(500).json({
       success: false,

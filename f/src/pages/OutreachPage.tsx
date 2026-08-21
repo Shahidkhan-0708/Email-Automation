@@ -11,14 +11,14 @@ export const OutreachPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-7">
-      <div className="grid grid-cols-[1fr_296px] gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_296px] gap-7">
         <RiseIn>
           <SendWindowCard />
         </RiseIn>
         <DialCards />
       </div>
 
-      <div className="grid grid-cols-[1fr_360px] gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7">
         <RiseIn delay={100}>
           <StatusBreakdown />
         </RiseIn>
@@ -28,10 +28,13 @@ export const OutreachPage: React.FC = () => {
             <p className="text-[13px] text-faint mt-0.5 mb-4">Integrations & sync state</p>
             <ServiceHealth />
             <div className="mt-6 recessed rounded-[16px] p-4">
-              <MonoLabel className="mb-2.5">Throttle</MonoLabel>
+              <MonoLabel className="mb-2.5">Pacing</MonoLabel>
               <p className="text-[12px] text-ink-dim leading-relaxed">
-                Daily cap <span className="font-mono text-amber-ink">{stats?.config.dailySendLimit ?? 400}</span> · per-hour cap{' '}
-                <span className="font-mono text-amber-ink">40</span> · cooldown <span className="font-mono text-blue">90s</span>
+                Daily cap <span className="font-mono text-amber-ink">{stats?.config.dailySendLimit ?? 0}</span> ·{' '}
+                configured capacity{' '}
+                <span className="font-mono text-amber-ink">up to {Math.max(1, Math.round((3600 / ((stats?.config.sendDelayMs ?? 2000) / 1000)) * (stats?.config.smtpConcurrency ?? 1)))}/hr</span> at{' '}
+                <span className="font-mono text-blue">{(stats?.config.sendDelayMs ?? 2000) / 1000}s</span> delay ·{' '}
+                <span className="font-mono text-blue">{stats?.config.smtpConcurrency ?? 1}</span> parallel — actual pace is measured from real sends
               </p>
             </div>
           </Card>
@@ -46,7 +49,7 @@ export const OutreachPage: React.FC = () => {
               <SectionTitle>Dispatch log</SectionTitle>
               <p className="text-[13px] text-faint mt-0.5">{outreach.length} outreach records</p>
             </div>
-            <MonoLabel>SMTP · Brevo · healthy</MonoLabel>
+            <MonoLabel>SMTP · {stats?.config.integrations?.smtp ? 'configured' : 'not configured'}</MonoLabel>
           </div>
           {outreach.length === 0 ? (
             <EmptyState title="No dispatches yet" hint="Approved drafts are sent through the rate-limited SMTP pipeline." />

@@ -4,7 +4,7 @@ import { useApp } from '@/lib/AppContext'
 import { InboundList } from '@/components/widgets'
 import { Pressable, RiseIn } from '@/components/motion'
 import { Card, SectionTitle, Avatar, Badge, EmptyState, LoadingState, initialsOf } from '@/components/ui'
-import { replyClassColors } from '@/lib/demo'
+import { replyClassColors } from '@/lib/reply-colors'
 import { cn } from '@/lib/utils'
 
 export const RepliesPage: React.FC = () => {
@@ -24,7 +24,7 @@ export const RepliesPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-7">
-      <div className="grid grid-cols-[360px_1fr] gap-7 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-7 items-start">
         <RiseIn>
           <InboundList title="Inbound" />
         </RiseIn>

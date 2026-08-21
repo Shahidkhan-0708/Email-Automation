@@ -11,21 +11,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Database & Services
 import { getOrCreateDefaultCampaign } from './db/campaigns.js';
 import { createOrUpdateContact, markContactSuppressed } from './db/contacts.js';
+import { createOrUpdateProfile } from './db/profiles.js';
 import { getSupabaseClient } from './db/client.js';
 import { processOutreachBatch } from './services/outreach.service.js';
 import { processFollowUpsBatch } from './services/followup.service.js';
+import { processPendingPersonalizations } from './services/personalization.service.js';
 import { processIncomingReplies } from './services/reply.service.js';
 import { syncSupabaseToAirtable } from './integrations/airtable/sync.js';
+import { resetStaleClaims } from './db/outreach.js';
 
 // Integrations & Webhooks
 import { generateAuthUrl, exchangeCodeForTokens, testGmail } from './integrations/gmail/client.js';
 import { webhookRouter } from './webhooks/email-events.js';
 import { requireApiKey } from './middleware/api-key.js';
+import { requireAuth } from './middleware/supabase-auth.js';
+import { requireModule, attachUserProfile } from './middleware/rbac.js';
 
 // API Routers
+import { authRouter } from './routes/auth.routes.js';
 import { importRouter } from './routes/import.routes.js';
 import { personalizationRouter } from './routes/personalization.routes.js';
 import { dashboardRouter } from './routes/dashboard.routes.js';
+import { alumniRouter } from './routes/alumni.routes.js';
+import { jobSearchRouter } from './routes/job-search.routes.js';
 
 // Scheduled Jobs
 import { scheduleOutreachJob } from './jobs/send-outreach.job.js';
@@ -50,6 +58,16 @@ const staticRoot = fs.existsSync(v2ReactDist)
   : fs.existsSync(reactDist)
     ? reactDist
     : legacyRoot;
+
+// Landing page (public) — served BEFORE the SPA static middleware so
+// /, /login, /signup show the marketing page instead of the dashboard SPA.
+const landingPath = path.join(__dirname, '..', 'f', 'public', 'landing.html');
+const hasLanding = fs.existsSync(landingPath);
+if (hasLanding) {
+  app.get('/', (_req, res) => res.sendFile(landingPath));
+}
+
+// Dashboard SPA static assets (f/dist) — serves JS/CSS bundles and index.html
 app.use(express.static(staticRoot));
 
 // ----------------------------------------------------
@@ -71,9 +89,15 @@ app.get('/health', (req, res) => {
 });
 
 // ----------------------------------------------------
+// Auth Routes (signup, login, session)
+// ----------------------------------------------------
+app.use('/auth', authRouter);
+
+// ----------------------------------------------------
 // Gmail OAuth 2.0 Flow & Test Endpoints
 // ----------------------------------------------------
-app.get('/api/test/gmail', testGmail);
+// Diagnostic endpoint — must be behind the admin key like every other /api route.
+app.get('/api/test/gmail', requireAuth, testGmail);
 
 app.get('/auth/google', (req, res) => {
 
@@ -148,10 +172,15 @@ app.use('/webhooks', webhookRouter);
 
 // ----------------------------------------------------
 // API Routers (Import, Personalization, Review, Bulk, Data)
+// Outreach module — gated by requireModule('outreach')
 // ----------------------------------------------------
-app.use('/api', importRouter);
-app.use('/api', personalizationRouter);
-app.use('/api', dashboardRouter);
+app.use('/api', requireModule('outreach'), importRouter);
+app.use('/api', requireModule('outreach'), personalizationRouter);
+app.use('/api', requireModule('outreach'), dashboardRouter);
+app.use('/api', requireModule('outreach'), alumniRouter);
+
+// Job Search module — gated by requireModule('job_search')
+app.use('/api', jobSearchRouter);
 
 // ----------------------------------------------------
 // SPA fallback: serve index.html for client-side routes
@@ -167,7 +196,7 @@ app.get('*', (req, res, next) => {
 // ----------------------------------------------------
 // Secured API Manual Trigger & Helper Endpoints
 // ----------------------------------------------------
-app.post('/api/trigger/outreach', requireApiKey, async (req, res) => {
+app.post('/api/trigger/outreach', requireAuth, async (req, res) => {
   logger.info('Manual trigger request received for Outreach job.');
   try {
     const result = await processOutreachBatch();
@@ -178,7 +207,7 @@ app.post('/api/trigger/outreach', requireApiKey, async (req, res) => {
   }
 });
 
-app.post('/api/trigger/followups', requireApiKey, async (req, res) => {
+app.post('/api/trigger/followups', requireAuth, async (req, res) => {
   logger.info('Manual trigger request received for Follow-ups job.');
   try {
     const result = await processFollowUpsBatch();
@@ -189,7 +218,7 @@ app.post('/api/trigger/followups', requireApiKey, async (req, res) => {
   }
 });
 
-app.post('/api/trigger/replies', requireApiKey, async (req, res) => {
+app.post('/api/trigger/replies', requireAuth, async (req, res) => {
   logger.info('Manual trigger request received for Reply detection job.');
   try {
     const result = await processIncomingReplies();
@@ -200,7 +229,31 @@ app.post('/api/trigger/replies', requireApiKey, async (req, res) => {
   }
 });
 
-app.post('/api/trigger/airtable-sync', requireApiKey, async (req, res) => {
+app.post('/api/trigger/personalization', requireAuth, async (req, res) => {
+  logger.info('Manual trigger request received for Personalization batch job.');
+  try {
+    const campaignId = req.body?.campaignId || null;
+    const limit = parseInt(req.body?.limit, 10) || 20;
+    const result = await processPendingPersonalizations(campaignId, limit);
+    res.json({ success: true, result });
+  } catch (err) {
+    logger.error('Manual personalization trigger failed:', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/trigger/cleanup-stale-claims', requireAuth, async (req, res) => {
+  logger.info('Manual trigger request received for stale-claim cleanup job.');
+  try {
+    await resetStaleClaims(parseInt(req.body?.timeoutMinutes, 10) || 10);
+    res.json({ success: true, message: 'Stale claim cleanup completed' });
+  } catch (err) {
+    logger.error('Manual stale-claim cleanup trigger failed:', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/trigger/airtable-sync', requireAuth, async (req, res) => {
   logger.info('Manual trigger request received for Airtable sync job.');
   try {
     await syncSupabaseToAirtable();
@@ -212,9 +265,14 @@ app.post('/api/trigger/airtable-sync', requireApiKey, async (req, res) => {
 });
 
 // Helper endpoint to seed a lead for testing
-app.post('/api/leads', requireApiKey, async (req, res) => {
+// NOTE: approval defaults to FALSE. The intended pipeline is import -> research
+// -> AI personalization -> human review -> approve -> send. Auto-approving a
+// lead with no personalization used to let generic template emails bypass the
+// whole review workflow (see product audit). opt in explicitly if you really
+// want a test lead pre-approved.
+app.post('/api/leads', requireAuth, async (req, res) => {
   try {
-    const { name, email, organization, role, personalization, approvePersonalization = true } = req.body;
+    const { name, email, organization, role, personalization, approvePersonalization = false } = req.body;
     if (!name || !email) {
       return res.status(400).json({ error: 'Name and Email are required' });
     }
@@ -226,6 +284,15 @@ app.post('/api/leads', requireApiKey, async (req, res) => {
       role: role || 'Professor',
       personalization: personalization || 'Recent paper on artificial intelligence',
       personalization_approved: Boolean(approvePersonalization),
+    });
+
+    // Mirrors the import pipeline: every contact gets a profile so enrichment
+    // and AI personalization can target it (Research page, Regenerate button).
+    await createOrUpdateProfile({
+      contact_id: contact.id,
+      full_name: name,
+      organization: organization || 'University',
+      role: role || 'Professor',
     });
 
     const campaign = await getOrCreateDefaultCampaign();
@@ -264,6 +331,16 @@ scheduleAirtableSyncJob();
 scheduleCleanupStaleClaimsJob();
 scheduleImportJob();
 schedulePersonalizationJob();
+
+if (config.env === 'production') {
+  const usingDefaults = [];
+  if (config.security.adminApiKey === 'dev_admin_key_123') usingDefaults.push('ADMIN_API_KEY');
+  if (config.security.unsubscribeJwtSecret === 'super_secret_unsubscribe_jwt_key') usingDefaults.push('UNSUBSCRIBE_JWT_SECRET');
+  if (config.security.webhookSecret === 'webhook_secret_key') usingDefaults.push('WEBHOOK_SECRET');
+  if (usingDefaults.length > 0) {
+    logger.warn(`SECURITY: production is running with default secrets (${usingDefaults.join(', ')}). Set strong random values in .env.`);
+  }
+}
 
 app.listen(config.port, '0.0.0.0', () => {
   logger.info(`=======================================================`);

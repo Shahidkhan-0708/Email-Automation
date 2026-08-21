@@ -14,15 +14,16 @@ import { RiseIn } from '@/components/motion'
 import { LoadingState } from '@/components/ui'
 
 export const DashboardPage: React.FC = () => {
-  const { stats, loading, reviewQueue, approve, reject } = useApp()
+  const { stats, loading, reviewQueue, profiles, approve, reject } = useApp()
   const navigate = useNavigate()
   const approvalItems = useApprovalItems()
 
   if (loading && !stats) return <LoadingState label="Loading overview…" />
 
   const contacts = stats?.contacts ?? 0
-  const enriched = Math.max(0, Math.min(contacts, Math.round(contacts * 0.86)))
-  const personalized = Math.max(0, Math.min(enriched, (stats?.outreach.sent ?? 0) + reviewQueue.length))
+  // Real counts from profiles: enrichment facts present / any draft generated.
+  const enriched = profiles.filter(p => p.enrichmentCount > 0).length
+  const personalized = profiles.filter(p => p.personalizationStatus != null).length
   const inReview = reviewQueue.length || stats?.reviewQueue || 0
   const sent = stats?.outreach.sent ?? 0
   const replied = stats?.outreach.replied ?? 0
@@ -39,7 +40,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="flex flex-col gap-7">
       {/* hero + dials */}
-      <div className="grid grid-cols-[1fr_296px] gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_296px] gap-7">
         <RiseIn>
           <SendWindowCard />
         </RiseIn>
@@ -52,7 +53,7 @@ export const DashboardPage: React.FC = () => {
       </RiseIn>
 
       {/* bottom row */}
-      <div className="grid grid-cols-[1fr_360px] gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7">
         <RiseIn delay={200}>
           <ApprovalList
             items={approvalItems}

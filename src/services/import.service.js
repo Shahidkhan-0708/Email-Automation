@@ -1,8 +1,6 @@
 import { parse as parseCsvSync } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
-// pdf-parse's main entry runs a debug-mode test read at load time; the lib entry
-// is the same implementation without that side effect.
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import { ocrBuffer, extractPdfTextLayer } from './ocr.service.js';
 import { logger } from '../utils/logger.js';
 import { createImportJob, getImportJob, updateImportJob, listImportJobs } from '../db/import-jobs.js';
 import { findContactByEmail, createOrUpdateContact } from '../db/contacts.js';
@@ -65,7 +63,7 @@ export async function processImportJob(jobId) {
       created_records: result.created,
       updated_records: result.updated,
       skipped_records: result.skipped,
-      error_message: null,
+      error_message: summarizeRowErrors(result.errors),
     });
 
     logger.info(`Import job ${job.id} completed. Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`);
@@ -84,6 +82,8 @@ export async function processImportJob(jobId) {
 // Parsers
 // ------------------------------------------------------------
 
+const MIN_TEXT_EXTRACT_LENGTH = 20; // below this, assume the PDF has no usable text layer
+
 export async function extractRows(buffer, fileType) {
   switch (fileType) {
     case 'csv':
@@ -92,6 +92,8 @@ export async function extractRows(buffer, fileType) {
       return parseXlsxBuffer(buffer);
     case 'pdf':
       return parsePdfBuffer(buffer);
+    case 'image':
+      return parseImageBuffer(buffer);
     default:
       throw new Error(`Unsupported file type '${fileType}'`);
   }
@@ -117,11 +119,31 @@ function parseXlsxBuffer(buffer) {
 }
 
 async function parsePdfBuffer(buffer) {
-  const data = await pdfParse(buffer);
-  const text = (data.text || '').trim();
-  if (!text) return [];
+  // 1. Try the embedded text layer first (fast path for text-based PDFs).
+  //    Extraction uses pdfjs-dist (maintained; the same engine as the OCR
+  //    path) — pdf-parse's bundled 2019-era pdf.js rejects valid modern PDFs.
+  const text = ((await extractPdfTextLayer(buffer)) || '').trim();
 
-  // PDFs often contain exported tables; attempt to parse the extracted
+  // 2. Scanned PDFs have no text layer — render pages and OCR them.
+  const ocrText = text.length >= MIN_TEXT_EXTRACT_LENGTH ? '' : await ocrBuffer(buffer, 'pdf');
+  const combined = [text, ocrText].filter(Boolean).join('\n\n');
+  if (!combined.trim()) return [];
+  return rowsFromText(combined);
+}
+
+/** OCR an uploaded image (png/jpg/webp) and turn the extracted text into rows. */
+async function parseImageBuffer(buffer) {
+  const text = await ocrBuffer(buffer, 'image');
+  if (!text.trim()) {
+    logger.warn('Image OCR returned no text');
+    return [];
+  }
+  return rowsFromText(text);
+}
+
+/** Shared: parse extracted text as a delimited table, else free-text lines. */
+export function rowsFromText(text) {
+  // Documents often contain exported tables; attempt to parse the extracted
   // text as a delimited table (comma/tab/semicolon separated).
   try {
     const records = parseCsvSync(text, {
@@ -131,11 +153,47 @@ async function parsePdfBuffer(buffer) {
       relax_column_count: true,
       delimiter: detectDelimiter(text),
     });
-    return normalizeRows(records);
+    const rows = normalizeRows(records);
+    if (rows.length > 0) return rows;
   } catch (err) {
-    logger.warn('PDF text could not be parsed as a table; treating each line as free text', { error: err.message });
-    return normalizeRows(text.split('\n').filter(Boolean).map(line => ({ text: line })));
+    logger.warn('Extracted text could not be parsed as a table; treating each line as free text', { error: err.message });
   }
+
+  // Free-text fallback: the text is not table-shaped (e.g. a scanned letter or
+  // a PDF whose layout broke). Never silently drop the content — pull emails
+  // out of each line with a regex. Non-email lines are held as a candidate name
+  // and paired with the next email line (a common OCR layout: "Dr. Jane Doe" on
+  // one line, "jane@university.edu" on the next). Lines that never pair are
+  // dropped, which only happens when they contain no contact data at all.
+  const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+  const rows = [];
+  let pendingName = null;
+
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const emailMatch = trimmed.match(EMAIL_RE);
+    if (emailMatch) {
+      const email = emailMatch[0];
+      const inlineName = trimmed.replace(email, '').replace(/[\t,;|]+/g, ' ').trim();
+      const name = inlineName || pendingName;
+      rows.push(name ? { name, email } : { email });
+      pendingName = null;
+    } else if (trimmed.length <= 80) {
+      pendingName = trimmed;
+    }
+  }
+
+  return rows;
+}
+
+/** Compact, persisted summary of per-row import failures (max ~800 chars). */
+function summarizeRowErrors(errors) {
+  if (!errors || errors.length === 0) return null;
+  const lines = errors.map(e => `${e.email}: ${e.error}`);
+  const joined = lines.join('; ');
+  return joined.length > 800 ? `${joined.slice(0, 797)}…` : joined;
 }
 
 function detectDelimiter(text) {

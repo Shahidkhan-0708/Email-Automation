@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>College Outreach Automation — AI-Powered Academic Outreach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    /* ================================================================
+       CSS CUSTOM PROPERTIES
+       ================================================================ */
+    :root {
+      --ink: #ffffff;
+      --ink-dim: rgba(255,255,255,0.82);
+      --ink-faint: rgba(255,255,255,0.6);
+      --pill-bg: rgba(20,28,34,0.45);
+      --pill-border: rgba(255,255,255,0.22);
+      --cta-bg: #ffffff;
+      --cta-ink: #14202a;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+      --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-smooth: cubic-bezier(0.45, 0, 0.15, 1);
+      /* mouse position (set by JS) */
+      --mx: 50%;
+      --my: 50%;
+      /* scroll progress (0-1, set by JS) */
+      --scroll: 0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      background: #0a0f14;
+      overflow-x: hidden;
+    }
+
+    /* ================================================================
+       KEYFRAME ANIMATIONS
+       ================================================================ */
+
+    /* --- Hero entrance stagger --- */
+    @keyframes heroFadeUp {
+      from { opacity: 0; transform: translateY(40px); filter: blur(8px); }
+      to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+    @keyframes heroBadgePop {
+      from { opacity: 0; transform: scale(0.7) translateY(15px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes navSlideDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes logoFadeIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* --- Floating particles --- */
+    @keyframes floatUp {
+      0%   { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+      10%  { opacity: 1; transform: translateY(80vh) translateX(10px) scale(1); }
+      90%  { opacity: 0.6; }
+      100% { transform: translateY(-10vh) translateX(-20px) scale(0.5); opacity: 0; }
+    }
+    @keyframes floatUp2 {
+      0%   { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+      15%  { opacity: 0.7; transform: translateY(70vh) translateX(-15px) scale(1); }
+      85%  { opacity: 0.4; }
+      100% { transform: translateY(-10vh) translateX(25px) scale(0.3); opacity: 0; }
+    }
+
+    /* --- Mountain parallax sway --- */
+    @keyframes mountainSway {
+      0%, 100% { transform: translateX(0) scaleY(1); }
+      25%      { transform: translateX(-8px) scaleY(1.005); }
+      50%      { transform: translateX(0) scaleY(1.01); }
+      75%      { transform: translateX(8px) scaleY(1.005); }
+    }
+    @keyframes mountainSway2 {
+      0%, 100% { transform: translateX(0) scaleY(1); }
+      33%      { transform: translateX(12px) scaleY(1.008); }
+      66%      { transform: translateX(-6px) scaleY(1.003); }
+    }
+
+    /* --- Gradient shift --- */
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+
+    /* --- Dot pulse glow --- */
+    @keyframes dotGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.2); }
+      50%      { box-shadow: 0 0 16px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.4), 0 0 60px rgba(255,255,255,0.1); }
+    }
+
+    /* --- Scroll reveals --- */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(50px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.88); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* --- Pipeline travel --- */
+    @keyframes pipelinePulse {
+      0%   { opacity: 0.3; transform: scaleX(0.5); }
+      50%  { opacity: 1; transform: scaleX(1); }
+      100% { opacity: 0.3; transform: scaleX(0.5); }
+    }
+    @keyframes arrowBounce {
+      0%, 100% { transform: translateX(0); }
+      50%      { transform: translateX(4px); }
+    }
+
+    /* --- Counter spin --- */
+    @keyframes countReveal {
+      from { opacity: 0; transform: translateY(30px) scale(0.8); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* --- Mouse glow --- */
+    @keyframes mouseGlowPulse {
+      0%, 100% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); }
+      50%      { opacity: 0.25; transform: translate(-50%, -50%) scale(1.1); }
+    }
+
+    /* ================================================================
+       HERO ENTRANCE CLASSES (applied on load)
+       ================================================================ */
+    .anim-nav       { animation: navSlideDown 0.8s var(--ease-out) 0.1s both; }
+    .anim-badge     { animation: heroBadgePop 0.7s var(--ease-spring) 0.4s both; }
+    .anim-h1        { animation: heroFadeUp 1s var(--ease-out) 0.6s both; }
+    .anim-sub       { animation: heroFadeUp 0.9s var(--ease-out) 0.85s both; }
+    .anim-cta       { animation: heroFadeUp 0.8s var(--ease-spring) 1.1s both; }
+    .anim-logos     { animation: logoFadeIn 0.8s var(--ease-out) 1.4s both; }
+    .anim-logo-1    { animation: logoFadeIn 0.6s var(--ease-out) 1.5s both; }
+    .anim-logo-2    { animation: logoFadeIn 0.6s var(--ease-out) 1.65s both; }
+    .anim-logo-3    { animation: logoFadeIn 0.6s var(--ease-out) 1.8s both; }
+    .anim-logo-4    { animation: logoFadeIn 0.6s var(--ease-out) 1.95s both; }
+    .anim-logo-5    { animation: logoFadeIn 0.6s var(--ease-out) 2.1s both; }
+
+    /* ================================================================
+       SCROLL REVEAL SYSTEM
+       ================================================================ */
+    .sr {
+      opacity: 0;
+      transform: translateY(50px);
+      transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+    }
+    .sr.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    /* stagger children */
+    .sr-stagger .sr:nth-child(1) { transition-delay: 0ms; }
+    .sr-stagger .sr:nth-child(2) { transition-delay: 100ms; }
+    .sr-stagger .sr:nth-child(3) { transition-delay: 200ms; }
+    .sr-stagger .sr:nth-child(4) { transition-delay: 300ms; }
+    .sr-stagger .sr:nth-child(5) { transition-delay: 400ms; }
+    .sr-stagger .sr:nth-child(6) { transition-delay: 500ms; }
+
+    /* ================================================================
+       LAYOUT
+       ================================================================ */
+
+    /* --- Hero --- */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Mountain background layers */
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      z-index: -4;
+      width: 100%;
+      height: 120%;
+      object-fit: cover;
+      object-position: center 55%;
+      animation: mountainSway 20s var(--ease-smooth) infinite;
+      will-change: transform;
+    }
+    /* Second mountain layer (parallax offset) */
+    .hero-mountain-overlay {
+      position: absolute;
+      bottom: 0;
+      left: -5%;
+      width: 110%;
+      height: 45%;
+      z-index: -3;
+      background:
+        linear-gradient(175deg,
+          transparent 0%,
+          rgba(10,15,20,0.2) 30%,
+          rgba(8,12,17,0.6) 60%,
+          rgba(8,12,17,0.95) 100%);
+      animation: mountainSway2 25s var(--ease-smooth) infinite;
+      will-change: transform;
+    }
+    /* Gradient overlay */
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      background:
+        linear-gradient(135deg,
+          rgba(10,16,22,0.5) 0%,
+          rgba(10,16,22,0.1) 30%,
+          rgba(20,10,30,0.15) 60%,
+          rgba(8,12,17,0.8) 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 15s ease infinite;
+    }
+    /* Dark vignette bottom */
+    .hero-vignette {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40%;
+      z-index: -1;
+      background: linear-gradient(to top, rgba(8,12,17,0.95) 0%, transparent 100%);
+    }
+
+    /* Floating particles */
+    .particles {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.5);
+      animation: floatUp linear infinite;
+    }
+    .particle:nth-child(1)  { left: 5%;  animation-duration: 18s; animation-delay: 0s; width: 2px; height: 2px; background: rgba(232,165,82,0.4); }
+    .particle:nth-child(2)  { left: 15%; animation-duration: 22s; animation-delay: 2s; width: 4px; height: 4px; background: rgba(255,255,255,0.3); }
+    .particle:nth-child(3)  { left: 25%; animation-duration: 16s; animation-delay: 4s; width: 2px; height: 2px; }
+    .particle:nth-child(4)  { left: 35%; animation-duration: 24s; animation-delay: 1s; width: 3px; height: 3px; background: rgba(127,176,105,0.4); }
+    .particle:nth-child(5)  { left: 45%; animation-duration: 20s; animation-delay: 3s; width: 2px; height: 2px; }
+    .particle:nth-child(6)  { left: 55%; animation-duration: 19s; animation-delay: 5s; width: 4px; height: 4px; background: rgba(232,165,82,0.3); }
+    .particle:nth-child(7)  { left: 65%; animation-duration: 23s; animation-delay: 0.5s; width: 2px; height: 2px; }
+    .particle:nth-child(8)  { left: 75%; animation-duration: 17s; animation-delay: 2.5s; width: 3px; height: 3px; background: rgba(255,255,255,0.25); }
+    .particle:nth-child(9)  { left: 85%; animation-duration: 21s; animation-delay: 4.5s; width: 2px; height: 2px; }
+    .particle:nth-child(10) { left: 92%; animation-duration: 25s; animation-delay: 1.5s; width: 3px; height: 3px; background: rgba(127,176,105,0.35); }
+    .particle:nth-child(11) { left: 10%; animation-duration: 26s; animation-delay: 6s; width: 2px; height: 2px; background: rgba(232,165,82,0.25); }
+    .particle:nth-child(12) { left: 50%; animation-duration: 20s; animation-delay: 7s; width: 3px; height: 3px; background: rgba(255,255,255,0.2); }
+
+    /* Mouse-follow glow */
+    .mouse-glow {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232,165,82,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+      left: var(--mx);
+      top: var(--my);
+      transform: translate(-50%, -50%);
+      animation: mouseGlowPulse 4s ease-in-out infinite;
+      will-change: left, top;
+    }
+
+    /* --- Nav --- */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 40px;
+      transition: background 0.4s ease, backdrop-filter 0.4s ease, padding 0.3s ease, box-shadow 0.4s ease;
+    }
+    .nav.scrolled {
+      background: rgba(10,16,22,0.75);
+      backdrop-filter: blur(20px) saturate(1.2);
+      padding: 14px 40px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+    .nav-left { display: flex; align-items: center; gap: 44px; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-decoration: none;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .brand:hover { opacity: 0.85; transform: scale(1.02); }
+    .brand svg { display: block; }
+    .nav-links { display: flex; align-items: center; gap: 30px; }
+    .nav-link {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--ink-dim);
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: color 0.25s ease;
+    }
+    .nav-link:hover { color: var(--ink); }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 0;
+      width: 0;
+      height: 1.5px;
+      background: linear-gradient(90deg, var(--ink), transparent);
+      transition: width 0.35s var(--ease-out);
+    }
+    .nav-link:hover::after { width: 100%; }
+    .nav-link svg { opacity: 0.7; transition: transform 0.2s ease; }
+    .nav-link:hover svg { transform: translateY(1px); }
+    .nav-right { display: flex; align-items: center; gap: 22px; }
+    .signin {
+      color: var(--ink-dim);
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: color 0.25s ease;
+    }
+    .signin:hover { color: var(--ink); }
+    .btn-nav {
+      background: var(--cta-bg);
+      color: var(--cta-ink);
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 22px;
+      border-radius: 999px;
+      text-decoration: none;
+      transition: transform 0.25s var(--ease-spring), box-shadow 0.25s ease;
+    }
+    .btn-nav:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    .btn-nav:active { transform: scale(0.96); }
+
+    /* --- Center content --- */
+    .center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 24px 40px;
+      position: relative;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      backdrop-filter: blur(12px);
+      color: var(--ink-dim);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 9px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      margin-bottom: 34px;
+      transition: all 0.3s var(--ease-spring);
+    }
+    .badge:hover {
+      background: rgba(20,28,34,0.65);
+      border-color: rgba(255,255,255,0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+    .badge .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      animation: dotGlow 2.5s ease-in-out infinite;
+    }
+    .badge svg { opacity: 0.7; transition: transform 0.2s ease; }
+    .badge:hover svg { transform: translateX(3px); }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: clamp(44px, 6.4vw, 92px);
+      line-height: 1.08;
+      letter-spacing: -0.01em;
+      max-width: 20ch;
+      text-shadow: 0 2px 40px rgba(10,16,22,0.5);
+    }
+    .sub {
+      margin-top: 22px;
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--ink-dim);
+      max-width: 480px;
+      line-height: 1.6;
+    }
+    .btn-hero {
+      margin-top: 34px;
+      display: inline-block;
+      background: var(--cta-bg);
+      color: var(--cta-ink);
+      font-size: 16px;
+      font-weight: 600;
+      padding: 15px 30px;
+      border-radius: 999px;
+      text-decoration: none;
+      box-shadow: 0 10px 34px -10px rgba(8,12,17,0.6);
+      transition: all 0.3s var(--ease-spring);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(232,165,82,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: inherit;
+    }
+    .btn-hero:hover {
+      transform: translateY(-4px) scale(1.04);
+      box-shadow: 0 18px 50px -10px rgba(8,12,17,0.7);
+    }
+    .btn-hero:hover::before { opacity: 1; }
+    .btn-hero:active { transform: scale(0.96); }
+
+    /* --- Logo row --- */
+    .logos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 26px 56px;
+      padding: 26px 40px 54px;
+    }
+    .logo-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: rgba(255,255,255,0.65);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      transition: all 0.3s ease;
+    }
+    .logo-item:hover { color: rgba(255,255,255,1); transform: translateY(-2px); }
+    .logo-item.spaced { letter-spacing: 0.3em; font-weight: 500; font-size: 13px; }
+    .logo-item.script { font-family: var(--font-serif); font-style: italic; font-weight: 400; font-size: 19px; letter-spacing: 0; text-transform: none; }
+    .logo-item svg { display: block; opacity: 0.85; }
+
+    /* ================================================================
+       SECTIONS
+       ================================================================ */
+    .section {
+      padding: 100px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 300;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 17px;
+      color: var(--ink-dim);
+      max-width: 540px;
+      line-height: 1.6;
+    }
+
+    /* Features */
+    .features {
+      background: linear-gradient(180deg, rgba(10,16,22,0.9) 0%, rgba(8,12,17,0.95) 100%);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+    }
+    .features::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(232,165,82,0.4), transparent);
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 36px;
+      margin-top: 56px;
+    }
+    .feature-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 32px 28px;
+      transition: all 0.35s var(--ease-spring);
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(232,165,82,0.5), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .feature-card:hover {
+        transform: translateY(-8px);
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.15);
+        box-shadow: 0 25px 60px -15px rgba(0,0,0,0.5);
+      }
+      .feature-card:hover::before { opacity: 1; }
+    }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      transition: all 0.3s var(--ease-spring);
+    }
+    .feature-icon svg { opacity: 0.85; transition: opacity 0.2s ease; }
+    @media (hover: hover) and (pointer: fine) {
+      .feature-card:hover .feature-icon {
+        background: rgba(232,165,82,0.12);
+        transform: scale(1.12) rotate(-3deg);
+      }
+      .feature-card:hover .feature-icon svg { opacity: 1; }
+    }
+    .feature-card h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--ink);
+    }
+    .feature-card p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--ink-dim);
+    }
+
+    /* How it works */
+    .how-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 48px;
+      margin-top: 56px;
+    }
+    .step { text-align: center; }
+    .step-num {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: var(--ink);
+      transition: all 0.35s var(--ease-spring);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .step:hover .step-num {
+        transform: scale(1.2);
+        background: rgba(232,165,82,0.12);
+        border-color: rgba(232,165,82,0.4);
+        box-shadow: 0 0 30px rgba(232,165,82,0.15);
+      }
+    }
+    .step h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--ink);
+    }
+    .step p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--ink-dim);
+    }
+
+    /* Pipeline */
+    .pipeline-wrap {
+      background: rgba(10,16,22,0.7);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .pipeline-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-top: 56px;
+      flex-wrap: wrap;
+    }
+    .pipeline-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 0 20px;
+      transition: transform 0.3s var(--ease-spring);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .pipeline-stage:hover { transform: translateY(-6px); }
+    }
+    .pipeline-stage-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s var(--ease-spring);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .pipeline-stage:hover .pipeline-stage-icon {
+        background: rgba(232,165,82,0.1);
+        border-color: rgba(232,165,82,0.3);
+        box-shadow: 0 0 25px rgba(232,165,82,0.12);
+      }
+    }
+    .pipeline-stage-icon svg { opacity: 0.9; }
+    .pipeline-stage span {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-dim);
+      letter-spacing: 0.02em;
+    }
+    .pipeline-arrow {
+      color: rgba(255,255,255,0.2);
+      font-size: 22px;
+      padding: 0 6px;
+      margin-top: -20px;
+      transition: color 0.3s ease;
+      animation: arrowBounce 2s ease-in-out infinite;
+    }
+    .pipeline-arrow:nth-child(4)  { animation-delay: 0.2s; }
+    .pipeline-arrow:nth-child(6)  { animation-delay: 0.4s; }
+    .pipeline-arrow:nth-child(8)  { animation-delay: 0.6s; }
+    .pipeline-arrow:nth-child(10) { animation-delay: 0.8s; }
+
+    /* Stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+      margin-top: 56px;
+    }
+    .stat { text-align: center; }
+    .stat-value {
+      font-family: var(--font-serif);
+      font-size: clamp(36px, 4vw, 56px);
+      font-weight: 300;
+      line-height: 1.1;
+      margin-bottom: 8px;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-spring);
+    }
+    .stat-value.counted {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .stat-label {
+      font-size: 14px;
+      color: var(--ink-dim);
+      letter-spacing: 0.04em;
+    }
+
+    /* Testimonial */
+    .testimonial-section {
+      background: linear-gradient(180deg, rgba(10,16,22,0.8) 0%, rgba(8,12,17,0.95) 100%);
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .testimonial {
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .testimonial blockquote {
+      font-family: var(--font-serif);
+      font-size: clamp(22px, 3vw, 32px);
+      font-weight: 300;
+      line-height: 1.45;
+      font-style: italic;
+      color: var(--ink);
+      margin-bottom: 24px;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.8s var(--ease-out);
+    }
+    .testimonial.visible blockquote {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .testimonial cite {
+      font-style: normal;
+      font-size: 14px;
+      color: var(--ink-dim);
+      opacity: 0;
+      transition: opacity 0.8s var(--ease-out) 0.3s;
+    }
+    .testimonial.visible cite { opacity: 1; }
+    .testimonial::before {
+      content: '"';
+      display: block;
+      font-family: var(--font-serif);
+      font-size: 80px;
+      line-height: 1;
+      color: rgba(232,165,82,0.2);
+      margin-bottom: -20px;
+    }
+
+    /* CTA */
+    .cta-section {
+      text-align: center;
+      padding: 120px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 600px 400px at 50% 50%, rgba(232,165,82,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-section h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 300;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.7s var(--ease-out);
+    }
+    .cta-section.visible h2 { opacity: 1; transform: translateY(0); }
+    .cta-section p {
+      font-size: 17px;
+      color: var(--ink-dim);
+      margin-bottom: 34px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.7s var(--ease-out) 0.15s;
+    }
+    .cta-section.visible p { opacity: 1; transform: translateY(0); }
+    .cta-section .btn-hero {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.7s var(--ease-spring) 0.3s, box-shadow 0.25s ease;
+    }
+    .cta-section.visible .btn-hero { opacity: 1; transform: translateY(0); }
+
+    /* Footer */
+    footer {
+      padding: 40px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--ink-faint);
+    }
+    footer a {
+      color: var(--ink-dim);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    footer a:hover { color: var(--ink); }
+    .footer-links { display: flex; gap: 24px; }
+
+    /* Scroll progress bar */
+    .scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(232,165,82,0.8), rgba(127,176,105,0.8));
+      z-index: 100;
+      transform-origin: left;
+      transform: scaleX(var(--scroll));
+      transition: transform 0.1s linear;
+      width: 100%;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .sr, .stat-value, .testimonial blockquote, .testimonial cite,
+      .cta-section h2, .cta-section p, .cta-section .btn-hero {
+        opacity: 1; transform: none;
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .nav { padding: 18px 20px; }
+      .nav.scrolled { padding: 14px 20px; }
+      .nav-links { display: none; }
+      .logos { gap: 18px 32px; }
+      .features-grid, .how-steps { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .pipeline-flow { flex-direction: column; gap: 12px; }
+      .pipeline-arrow { transform: rotate(90deg); margin-top: 0; padding: 4px 0; animation: none; }
+      .section { padding: 60px 20px; }
+      footer { flex-direction: column; gap: 16px; text-align: center; }
+      .mouse-glow { display: none; }
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Scroll progress bar -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <img class="hero-bg" src="https://images.pexels.com/photos/5499545/pexels-photo-5499545.jpeg?auto=compress&cs=tinysrgb&w=2000" alt="Misty mountain ridges" width="1920" height="1280">
+  <div class="hero-mountain-overlay"></div>
+  <div class="hero-vignette"></div>
+
+  <!-- Floating particles -->
+  <div class="particles">
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+    <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+  </div>
+
+  <!-- Mouse-follow glow -->
+  <div class="mouse-glow" id="mouseGlow"></div>
+
+  <nav class="nav anim-nav" id="mainNav">
+    <div class="nav-left">
+      <a class="brand" href="/">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="12" fill="#fff"/><path d="M13 4a9 9 0 0 0 0 18c-3.2-2.2-5-5.4-5-9s1.8-6.8 5-9Z" fill="#141d26"/><path d="M13 7.5a6.8 6.8 0 0 0 0 11c-1.9-1.5-3-3.4-3-5.5s1.1-4 3-5.5Z" fill="#141d26" opacity="0.55"/></svg>
+        Outreach
+      </a>
+      <div class="nav-links">
+        <a class="nav-link" href="#features">Features
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="m1 1 4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="nav-link" href="#how-it-works">How It Works
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="m1 1 4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="nav-link" href="#pipeline">Pipeline</a>
+      </div>
+    </div>
+    <div class="nav-right">
+      <a class="signin" href="/login">Sign in</a>
+      <a class="btn-nav" href="/signup">Get Started</a>
+    </div>
+  </nav>
+
+  <div class="center">
+    <a class="badge anim-badge" href="/signup">
+      <span class="dot"></span>
+      AI-Powered Outreach
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <h1 class="anim-h1">Personalized outreach that actually gets replies.</h1>
+    <p class="sub anim-sub">Import leads, enrich with research, generate AI-crafted emails, and track every reply — all from one dashboard.</p>
+    <a class="btn-hero anim-cta" href="/signup">Start Free</a>
+  </div>
+
+  <div class="logos anim-logos">
+    <span class="logo-item spaced anim-logo-1">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 8h7M8 4.5v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      SUPABASE
+    </span>
+    <span class="logo-item script anim-logo-2">Brevo</span>
+    <span class="logo-item anim-logo-3">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 12 7.5 2 13 12H2Z" fill="currentColor"/></svg>
+      OPENAI
+    </span>
+    <span class="logo-item anim-logo-4">Gmail API</span>
+    <span class="logo-item spaced anim-logo-5">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="11" height="11" rx="3" stroke="currentColor" stroke-width="1.6"/></svg>
+      AIRTABLE
+    </span>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="features" id="features">
+  <div class="section">
+    <div class="sr">
+      <h2 class="section-title">Everything you need to reach out at scale</h2>
+      <p class="section-sub">From raw CSV to inbox replies — a complete pipeline that handles the research, writing, sending, and tracking so you can focus on building relationships.</p>
+    </div>
+
+    <div class="features-grid sr-stagger">
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>Smart Import</h3>
+        <p>Drop in CSV, XLSX, PDFs, or even scanned images. OCR extracts text from anything — no manual data entry needed.</p>
+      </div>
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <h3>Auto-Enrichment</h3>
+        <p>Fetches publications from OpenAlex, bios from Wikipedia, and news from DuckDuckGo — all free, no API keys required.</p>
+      </div>
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </div>
+        <h3>AI Personalization</h3>
+        <p>GPT-4o generates evidence-cited, human-sounding emails. Each draft references real facts about the recipient.</p>
+      </div>
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Human Review</h3>
+        <p>Approve, reject, or edit every draft before it sends. Bulk approve-and-send when you're ready. You stay in control.</p>
+      </div>
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Smart Dispatch</h3>
+        <p>Rate-limited SMTP with daily caps, configurable concurrency, and automatic follow-up scheduling. Never spam.</p>
+      </div>
+      <div class="feature-card sr">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>Reply Detection</h3>
+        <p>Gmail integration scans your inbox and AI-classifies every reply — positive, negative, out-of-office, or needs follow-up.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section id="how-it-works">
+  <div class="section" style="text-align:center;">
+    <div class="sr">
+      <h2 class="section-title">From spreadsheet to sent — in four steps</h2>
+      <p class="section-sub" style="margin:0 auto;">No complex setup. Import your leads, let AI do the research and writing, review what you like, and hit send.</p>
+    </div>
+
+    <div class="how-steps sr-stagger">
+      <div class="step sr">
+        <div class="step-num">1</div>
+        <h3>Import your leads</h3>
+        <p>Upload a CSV, paste from a spreadsheet, or scan a PDF. Contacts, profiles, and campaign enrollments are created automatically.</p>
+      </div>
+      <div class="step sr">
+        <div class="step-num">2</div>
+        <h3>Enrich & generate</h3>
+        <p>The system researches each person — publications, bios, news — then drafts a personalized email with cited evidence.</p>
+      </div>
+      <div class="step sr">
+        <div class="step-num">3</div>
+        <h3>Review & approve</h3>
+        <p>Read every draft in the review queue. Approve, edit, or reject. Bulk approve when you're confident in the batch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section class="pipeline-wrap" id="pipeline">
+  <div class="section" style="text-align:center;">
+    <div class="sr">
+      <h2 class="section-title">A pipeline that runs itself</h2>
+      <p class="section-sub" style="margin:0 auto;">Every lead flows through the same stages — from raw import to tracked reply. You approve the drafts; the system handles the rest.</p>
+    </div>
+
+    <div class="pipeline-flow">
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><span>Import</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><span>Research</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div><span>Personalize</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><span>Review</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div><span>Send</span></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage sr"><div class="pipeline-stage-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><span>Track Replies</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STATS ============ -->
+<section>
+  <div class="section" style="text-align:center;">
+    <div class="sr">
+      <h2 class="section-title">Built for teams that care about quality</h2>
+    </div>
+    <div class="stats-row">
+      <div class="stat sr">
+        <div class="stat-value" data-target="100" data-suffix="%">0%</div>
+        <div class="stat-label">Human-Approved</div>
+      </div>
+      <div class="stat sr">
+        <div class="stat-value" data-target="3" data-suffix="×">0×</div>
+        <div class="stat-label">Faster Than Manual</div>
+      </div>
+      <div class="stat sr">
+        <div class="stat-value counted" style="opacity:1;transform:none;">AI</div>
+        <div class="stat-label">Evidence-Cited Drafts</div>
+      </div>
+      <div class="stat sr">
+        <div class="stat-value" data-target="0">0</div>
+        <div class="stat-label">Spam or Cold Sends</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIAL ============ -->
+<section class="testimonial-section">
+  <div class="section">
+    <div class="testimonial sr">
+      <blockquote>"We went from spending 3 hours personalizing each outreach batch to reviewing pre-drafted, research-backed emails in 15 minutes. The reply rate speaks for itself."</blockquote>
+      <cite>— Outreach Team Lead</cite>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta-section sr">
+  <h2>Stop writing emails. Start building relationships.</h2>
+  <p>Import your first leads today. The AI handles the research and writing — you just approve and send.</p>
+  <a class="btn-hero" href="/signup">Get Started Free</a>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <span>© 2026 College Outreach Automation. All rights reserved.</span>
+  <div class="footer-links">
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="#">Documentation</a>
+    <a href="#">GitHub</a>
+  </div>
+</footer>
+
+<!-- ================================================================
+     JavaScript — scroll reveals, counters, nav, mouse, particles
+     ================================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  /* ---- IntersectionObserver: scroll reveals ---- */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -30px 0px' });
+
+  document.querySelectorAll('.sr, .testimonial, .cta-section').forEach(el => io.observe(el));
+
+  /* ---- Counter animation ---- */
+  const cio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      if (el.classList.contains('counted')) return;
+      const target = parseInt(el.dataset.target, 10);
+      if (isNaN(target)) { el.classList.add('counted'); cio.unobserve(el); return; }
+      const suffix = el.dataset.suffix || '';
+      const dur = 1800;
+      const start = performance.now();
+      function tick(now) {
+        const p = Math.min((now - start) / dur, 1);
+        const eased = 1 - Math.pow(2, -10 * p);
+        el.textContent = Math.round(eased * target) + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+        else el.classList.add('counted');
+      }
+      el.classList.add('counted');
+      requestAnimationFrame(tick);
+      cio.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.stat-value[data-target]').forEach(el => cio.observe(el));
+
+  /* ---- Nav scroll effect ---- */
+  const nav = document.getElementById('mainNav');
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        if (nav) nav.classList.toggle('scrolled', window.scrollY > 60);
+        // scroll progress
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        const pct = max > 0 ? window.scrollY / max : 0;
+        document.documentElement.style.setProperty('--scroll', pct);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  /* ---- Mouse glow ---- */
+  const glow = document.getElementById('mouseGlow');
+  if (glow && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    let raf = false;
+    document.addEventListener('mousemove', (e) => {
+      if (!raf) {
+        requestAnimationFrame(() => {
+          document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+          document.documentElement.style.setProperty('--my', e.clientY + 'px');
+          raf = false;
+        });
+        raf = true;
+      }
+    }, { passive: true });
+  }
+
+})();
+</script>
+
+</body>
+</html>

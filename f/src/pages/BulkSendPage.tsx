@@ -3,6 +3,7 @@ import { ShieldCheck, AlertTriangle, Send, X } from 'lucide-react'
 import { useApp } from '@/lib/AppContext'
 import { Pressable, RiseIn, CountUp } from '@/components/motion'
 import { Card, SectionTitle, MonoLabel, Badge, LoadingState } from '@/components/ui'
+import { confidenceOf, evidenceCount } from '@/components/widgets'
 import { cn } from '@/lib/utils'
 
 export const BulkSendPage: React.FC = () => {
@@ -15,20 +16,33 @@ export const BulkSendPage: React.FC = () => {
   if (loading && !stats) return <LoadingState label="Loading preflight…" />
 
   const total = reviewQueue.length
-  const highConfidence = reviewQueue.filter(p => confidenceOfReview(p) >= 0.8).length
-  const flagged = total - highConfidence
-  const cap = stats?.config.dailySendLimit ?? 400
+  // Real signals from the drafts themselves: how many cite evidence, and how
+  // many have a recorded evidence confidence of >= 0.8. No invented scores.
+  const withEvidence = reviewQueue.filter(p => evidenceCount(p) > 0).length
+  const highConfidence = reviewQueue.filter(p => {
+    const c = confidenceOf(p)
+    return c != null && c >= 0.8
+  }).length
+  const lowConfidence = total - highConfidence
+  const cap = stats?.config.dailySendLimit ?? 0
   const sentToday = stats?.outreach.sent ?? 0
   const remaining = Math.max(0, cap - sentToday)
   const dispatchable = Math.min(total, remaining)
-  const minutes = Math.ceil((dispatchable / 40) * 60)
+  const delaySec = (stats?.config.sendDelayMs ?? 2000) / 1000
+  const concurrency = stats?.config.smtpConcurrency ?? 1
+  // Theoretical ceiling, not measured throughput — labeled as such.
+  const capacityPerHour = Math.max(1, Math.round((3600 / delaySec) * concurrency))
+  const minutes = Math.ceil((dispatchable / capacityPerHour) * 60)
+  const smtpConfigured = !!stats?.config.integrations?.smtp
 
+  // The backend approves every pending draft (human decisions already made on
+  // the Review page); the dispatch itself is capped by the daily send limit.
   const checks = [
-    { label: 'Drafts approved for send', ok: total > 0, detail: `${total} in queue` },
-    { label: 'High-confidence score (≥ 0.80)', ok: highConfidence > 0, detail: `${highConfidence} drafts` },
+    { label: 'Drafts awaiting approval', ok: total > 0, detail: `${total} in queue` },
+    { label: 'Evidence recorded', ok: withEvidence > 0, detail: `${withEvidence}/${total} drafts cite research facts` },
     { label: 'Daily send limit', ok: remaining > 0, detail: `${sentToday}/${cap} used · ${remaining} remaining` },
-    { label: 'SMTP auth healthy', ok: true, detail: 'Brevo · healthy' },
-    { label: 'Rate throttle (40/hr, 90s cooldown)', ok: true, detail: 'within window' },
+    { label: 'SMTP configured', ok: smtpConfigured, detail: smtpConfigured ? 'credentials present' : 'not configured — sends will fail' },
+    { label: 'Capacity (configured)', ok: true, detail: `up to ${capacityPerHour}/hr at ${concurrency} parallel · ${delaySec}s delay` },
   ]
 
   const proceed = async () => {
@@ -48,7 +62,7 @@ export const BulkSendPage: React.FC = () => {
           <div>
             <SectionTitle className="text-[18px]">Bulk approve & send</SectionTitle>
             <p className="text-[13px] text-faint mt-0.5">
-              {campaign ? `Campaign: ${campaign.name}` : 'All campaigns'} · safe dispatch through the rate limiter
+              {campaign ? `Campaign: ${campaign.name}` : 'All campaigns'} · approves the queue, then dispatches through the rate limiter
             </p>
           </div>
           <Badge tone={remaining > 0 ? 'sage' : 'terra'}>
@@ -57,7 +71,7 @@ export const BulkSendPage: React.FC = () => {
         </Card>
       </RiseIn>
 
-      <div className="grid grid-cols-[1fr_360px] gap-7 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7 items-start">
         <RiseIn delay={80}>
           <Card>
             <SectionTitle className="text-[18px]">Preflight checks</SectionTitle>
@@ -89,7 +103,7 @@ export const BulkSendPage: React.FC = () => {
                   <CountUp to={dispatchable} duration={1200} delay={250} />
                 </p>
                 <p className="font-mono text-[11px] text-faint mt-1.5">
-                  ≈ {minutes} min at 40/hr · queued <span className="text-amber-ink">{flagged}</span> flagged for human
+                  ≈ {minutes} min at configured capacity ({capacityPerHour}/hr) · <span className="text-terra-ink">{lowConfidence}</span> drafts with low/no evidence confidence
                 </p>
               </div>
               <Pressable
@@ -111,10 +125,10 @@ export const BulkSendPage: React.FC = () => {
             <SectionTitle className="text-[18px]">Consequences</SectionTitle>
             <p className="text-[13px] text-faint mt-0.5 mb-4">What this action actually does</p>
             <ul className="flex flex-col gap-3 text-[12.5px] text-ink-dim leading-relaxed">
-              <li className="flex gap-2.5"><Dot color="#7FB069" /> Approves <b className="text-ink">{highConfidence}</b> drafts with score ≥ 0.80.</li>
-              <li className="flex gap-2.5"><Dot color="#E8A552" /> Flags <b className="text-ink">{flagged}</b> low-confidence items for human review — they are not sent.</li>
-              <li className="flex gap-2.5"><Dot color="#5B7DB1" /> Dispatches up to <b className="text-ink">{dispatchable}</b> emails through SMTP at 40/hr.</li>
-              <li className="flex gap-2.5"><Dot color="#C4715A" /> Stops at the daily cap of <b className="text-ink">{cap}</b>. Nothing sends outside the 09:00–17:00 window.</li>
+              <li className="flex gap-2.5"><Dot color="#7FB069" /> Approves <b className="text-ink">{total}</b> pending drafts — every draft in the queue, including low-confidence ones.</li>
+              <li className="flex gap-2.5"><Dot color="#E8A552" /> <b className="text-ink">{highConfidence}</b> drafts carry evidence confidence ≥ 0.80; <b className="text-ink">{lowConfidence}</b> have low or no recorded confidence — check those on the Review page first if unsure.</li>
+              <li className="flex gap-2.5"><Dot color="#5B7DB1" /> Dispatches up to <b className="text-ink">{dispatchable}</b> emails through SMTP — the configured ceiling is {capacityPerHour}/hr; actual pace depends on the provider.</li>
+              <li className="flex gap-2.5"><Dot color="#C4715A" /> Stops at the daily cap of <b className="text-ink">{cap}</b>. Approved drafts beyond the cap stay Ready and send on later runs.</li>
               <li className="flex gap-2.5"><Dot color="#a89d91" /> Sends are real. There is no undo.</li>
             </ul>
           </Card>
@@ -132,12 +146,13 @@ export const BulkSendPage: React.FC = () => {
               </button>
             </div>
             <p className="text-[13.5px] text-ink-soft leading-relaxed">
-              You are about to approve and dispatch{' '}
-              <b className="text-ink">{dispatchable} emails</b> to <b className="text-ink">{highConfidence} contacts</b>{' '}
-              via <b className="text-ink">Brevo SMTP</b> at 40/hr. {flagged} low-confidence drafts are excluded and stay in review.
+              You are about to approve <b className="text-ink">{total} drafts</b> and dispatch{' '}
+              <b className="text-ink">{dispatchable} emails</b> via <b className="text-ink">SMTP</b> at up to {capacityPerHour}/hr (configured capacity).
+              {' '}{lowConfidence} drafts have low or no evidence confidence — they are still approved by this action.
             </p>
             <div className="mt-5 recessed rounded-[16px] p-4 font-mono text-[11px] text-ink-dim flex flex-col gap-1.5">
-              <span>→ {dispatchable} emails queued for dispatch</span>
+              <span>→ {total} drafts approved</span>
+              <span>→ up to {dispatchable} emails dispatched this run</span>
               <span>→ estimated {minutes} min to complete</span>
               <span>→ daily cap {cap} · {remaining} remaining after this batch</span>
             </div>
@@ -164,8 +179,3 @@ export const BulkSendPage: React.FC = () => {
 }
 
 const Dot: React.FC<{ color: string }> = ({ color }) => <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: color }} />
-
-function confidenceOfReview(p: { evidence_used?: unknown[] }): number {
-  const evidence = Array.isArray(p.evidence_used) ? p.evidence_used.length : 0
-  return Math.max(0.5, Math.min(0.98, 0.9 + Math.min(0.06, evidence * 0.02)))
-}

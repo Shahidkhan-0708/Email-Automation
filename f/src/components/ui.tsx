@@ -119,17 +119,16 @@ export const Avatar: React.FC<{ initials: string; tone?: 'default' | 'terra'; si
   </span>
 )
 
-export const ScoreChip: React.FC<{ score: number; className?: string }> = ({ score, className }) => (
-  <span
-    className={cn(
-      'font-mono text-[11px] font-medium px-2.5 py-1 rounded-full recessed-sm shrink-0',
-      score < 0.8 ? 'text-terra-ink' : 'text-amber-ink',
-      className
-    )}
-  >
-    {score.toFixed(2)}
-  </span>
-)
+export const ScoreChip: React.FC<{ score: number | null; className?: string }> = ({ score, className }) => {
+  // null = no evidence recorded — displayed honestly as "—", never fabricated.
+  const label = score == null ? '—' : score.toFixed(2)
+  const tone = score == null ? 'text-faint' : score < 0.8 ? 'text-terra-ink' : 'text-amber-ink'
+  return (
+    <span className={cn('font-mono text-[11px] font-medium px-2.5 py-1 rounded-full recessed-sm shrink-0', tone, className)}>
+      {label}
+    </span>
+  )
+}
 
 export const Badge: React.FC<{
   children: React.ReactNode

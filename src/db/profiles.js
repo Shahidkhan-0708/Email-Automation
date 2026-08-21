@@ -1,13 +1,32 @@
 import { getSupabaseClient } from './client.js';
 import { logger } from '../utils/logger.js';
 
+// Columns that exist in the profiles table.  The insert/upsert rejects
+// any key that isn't a real column, so we whitelist explicitly.
+const PROFILE_COLUMNS = new Set([
+  'id', 'contact_id', 'full_name', 'organization', 'role',
+  'college', 'degree', 'graduation_year', 'skills', 'projects',
+  'experience', 'public_profile_urls', 'linkedin_url',
+  'research_status', 'identity_confidence', 'best_match',
+  'candidates_count', 'research_last_run_at', 'research_error',
+  'research_steps', 'created_at', 'updated_at',
+]);
+
+function pickProfileColumns(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (PROFILE_COLUMNS.has(k) && v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
 export async function createOrUpdateProfile(profileData) {
   const supabase = getSupabaseClient();
-  const normalized = {
+  const normalized = pickProfileColumns({
     ...profileData,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
-  };
+  });
 
   // One profile per contact: prefer an existing row, otherwise insert.
   // (Avoids relying on a unique constraint on profiles.contact_id for upsert.)

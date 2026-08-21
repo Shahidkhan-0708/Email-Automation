@@ -38,6 +38,23 @@ export async function processIncomingReplies() {
       outreachRecord = await findOutreachByGmailThreadId(reply.threadId);
     }
 
+    // 2b. Fallback: In-Reply-To header matches a stored provider_message_id.
+    //     This is the critical path for SMTP-sent emails: Brevo assigns a
+    //     Message-ID, the recipient's reply sets In-Reply-To to that ID, and
+    //     we match it against the outreach record we saved at send time.
+    if (!outreachRecord && reply.inReplyTo) {
+      const supabase = getSupabaseClient();
+      const { data: records } = await supabase
+        .from('outreach')
+        .select('*, contacts(*)')
+        .eq('provider_message_id', reply.inReplyTo)
+        .limit(1);
+      if (records && records.length > 0) {
+        outreachRecord = records[0];
+        logger.info(`Matched reply via In-Reply-To ${reply.inReplyTo} to outreach ${outreachRecord.id}`);
+      }
+    }
+
     // 3. Fallback matching: Sender Email
     if (!outreachRecord && reply.fromEmail) {
       const contact = await findContactByEmail(reply.fromEmail);

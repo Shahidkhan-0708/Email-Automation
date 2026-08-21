@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, WandSparkles } from 'lucide-react'
+import { ArrowLeft, WandSparkles, Check, X, Pencil, CornerDownLeft, Send } from 'lucide-react'
 import { useApp } from '@/lib/AppContext'
 import { Pressable, RiseIn } from '@/components/motion'
 import { Card, SectionTitle, MonoLabel, Avatar, Badge, EmptyState, LoadingState, initialsOf, ScoreChip } from '@/components/ui'
@@ -9,15 +9,76 @@ import { confidenceOf } from '@/components/widgets'
 export const PersonDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { contacts, profiles, outreach, reviewQueue, loading, stats, generateForProfile } = useApp()
+  const {
+    contacts, profiles, outreach, reviewQueue, loading, stats,
+    generateForProfile, approve, reject, runOutreach,
+  } = useApp()
+
+  const [editing, setEditing] = useState(false)
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [actionBusy, setActionBusy] = useState<'approve' | 'reject' | 'edit-approve' | 'send' | null>(null)
 
   const contact = useMemo(() => contacts.find(c => c.id === id), [contacts, id])
   const profile = useMemo(() => profiles.find(p => p.contactId === id), [profiles, id])
   const history = useMemo(() => outreach.filter(o => o.contact_id === id), [outreach, id])
+  // Pending draft from the live review queue, matched by profile id
   const pending = useMemo(
-    () => reviewQueue.find(p => (Array.isArray(p.profiles?.contacts) ? p.profiles.contacts[0]?.id === id : p.profiles?.contacts?.id === id)),
-    [reviewQueue, id]
+    () => reviewQueue.find(p => p.profile_id === profile?.id),
+    [reviewQueue, profile]
   )
+  // Latest AI draft for this profile from the backend (any status). A pending
+  // review draft always wins so the freshest version is shown.
+  const draft = pending ?? profile?.latestDraft ?? null
+
+  // Enter edit mode with the current draft content
+  const startEditing = () => {
+    if (!draft) return
+    setSubject(draft.subject)
+    setBody(draft.body)
+    setEditing(true)
+  }
+
+  const handleApprove = async () => {
+    if (!draft || actionBusy) return
+    setActionBusy('approve')
+    try {
+      await approve(draft.id)
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!draft || actionBusy) return
+    setActionBusy('reject')
+    try {
+      await reject(draft.id)
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  const handleApproveWithEdits = async () => {
+    if (!draft || actionBusy) return
+    setActionBusy('edit-approve')
+    try {
+      await approve(draft.id, { editedSubject: subject, editedBody: body })
+      setEditing(false)
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  const handleSendNow = async () => {
+    if (actionBusy) return
+    setActionBusy('send')
+    try {
+      await runOutreach()
+    } finally {
+      setActionBusy(null)
+    }
+  }
 
   if (loading && !stats) return <LoadingState label="Loading profile…" />
   if (!contact) {
@@ -48,7 +109,7 @@ export const PersonDetailPage: React.FC = () => {
         </div>
       </RiseIn>
 
-      <div className="grid grid-cols-[1fr_360px] gap-7 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7 items-start">
         <div className="flex flex-col gap-7">
           {/* identity */}
           <RiseIn delay={60}>
@@ -60,8 +121,8 @@ export const PersonDetailPage: React.FC = () => {
                 <p className="font-mono text-[11px] text-faint mt-1">{contact.role || contact.email}</p>
               </div>
               <div className="ml-auto flex flex-col items-end gap-2">
-                <Badge tone={contact.personalizationApproved ? 'sage' : 'amber'}>
-                  {contact.personalizationApproved ? 'ready to send' : 'draft ready'}
+                <Badge tone={badgeToneFor(history[0]?.status, pending, contact, draft)}>
+                  {badgeTextFor(history[0]?.status, pending, contact, draft)}
                 </Badge>
               </div>
             </Card>
@@ -111,18 +172,129 @@ export const PersonDetailPage: React.FC = () => {
                 </Pressable>
               )}
             </div>
-            {pending ? (
-              <div className="recessed rounded-[16px] p-4">
-                <p className="font-display italic text-[14px] text-ink mb-2">“{pending.subject}”</p>
-                <p className="text-[12.5px] text-ink-soft leading-relaxed line-clamp-6 whitespace-pre-line">{pending.body}</p>
-                <div className="flex items-center justify-between mt-3">
-                  <ScoreChip score={confidenceOf(pending)} />
-                  <Badge tone="amber">pending review</Badge>
+            {draft ? (
+              <>
+                <div className="recessed rounded-[16px] p-4">
+                  {editing ? (
+                    <div className="flex flex-col gap-3">
+                      <input
+                        value={subject}
+                        onChange={e => setSubject(e.target.value)}
+                        className="rounded-[10px] px-3 py-2 text-[14px] font-semibold text-ink bg-paper outline-none focus:ring-2 focus:ring-amber/40 recessed-sm"
+                        placeholder="Subject"
+                      />
+                      <textarea
+                        value={body}
+                        onChange={e => setBody(e.target.value)}
+                        rows={8}
+                        className="rounded-[10px] px-3 py-2 text-[12.5px] text-ink-soft leading-relaxed bg-paper outline-none focus:ring-2 focus:ring-amber/40 resize-y recessed-sm"
+                        placeholder="Email body"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-display italic text-[14px] text-ink mb-2">"{draft.subject}"</p>
+                      <p className="text-[12.5px] text-ink-soft leading-relaxed line-clamp-6 whitespace-pre-line">{draft.body}</p>
+                    </>
+                  )}
+                  <div className="flex items-center justify-between mt-3">
+                    <ScoreChip score={confidenceOf(draft)} />
+                    <Badge tone={draft.status === 'pending_review' ? 'amber' : 'sage'}>
+                      {draft.status === 'pending_review' ? 'pending review' : draft.status}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
+
+                {/* action buttons */}
+                {draft.status === 'pending_review' && (
+                  <div className="flex flex-col gap-2.5 mt-4">
+                    <div className="flex items-center gap-2.5">
+                      <Pressable
+                        onClick={handleApprove}
+                        disabled={actionBusy !== null}
+                        className="press flex-1 bg-sage text-white rounded-[14px] px-4 py-3 text-[13px] font-bold flex items-center justify-center gap-2 hover:brightness-105 transition-[filter] disabled:opacity-50 disabled:transform-none"
+                      >
+                        {actionBusy === 'approve' ? (
+                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                        Approve & send
+                      </Pressable>
+                      <Pressable
+                        onClick={handleReject}
+                        disabled={actionBusy !== null}
+                        className="press raised-sm rounded-[14px] px-4 py-3 text-[13px] font-semibold text-terra-ink flex items-center justify-center gap-2 disabled:opacity-50 disabled:transform-none"
+                      >
+                        {actionBusy === 'reject' ? (
+                          <span className="animate-spin h-3.5 w-3.5 border-2 border-terra/30 border-t-terra rounded-full" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                        Reject
+                      </Pressable>
+                    </div>
+                    {editing ? (
+                      <div className="flex items-center gap-2.5">
+                        <Pressable
+                          onClick={handleApproveWithEdits}
+                          disabled={actionBusy !== null}
+                          className="press flex-1 raised-sm rounded-[14px] px-4 py-2.5 text-[12px] font-semibold text-amber-ink flex items-center justify-center gap-2 disabled:opacity-50 disabled:transform-none"
+                        >
+                          {actionBusy === 'edit-approve' ? (
+                            <span className="animate-spin h-3 w-3 border-2 border-amber/30 border-t-amber rounded-full" />
+                          ) : (
+                            <CornerDownLeft className="h-3 w-3" />
+                          )}
+                          Approve with edits
+                        </Pressable>
+                        <Pressable
+                          onClick={() => setEditing(false)}
+                          disabled={actionBusy !== null}
+                          className="press raised-sm rounded-[14px] px-4 py-2.5 text-[12px] font-semibold text-ink-dim disabled:opacity-50 disabled:transform-none"
+                        >
+                          Cancel
+                        </Pressable>
+                      </div>
+                    ) : (
+                      <Pressable
+                        onClick={startEditing}
+                        disabled={actionBusy !== null}
+                        className="press raised-sm rounded-[14px] px-4 py-2.5 text-[12px] font-semibold text-ink-dim flex items-center justify-center gap-2 disabled:opacity-50 disabled:transform-none"
+                      >
+                        <Pencil className="h-3 w-3" /> Edit draft
+                      </Pressable>
+                    )}
+                  </div>
+                )}
+
+                {draft.status === 'approved' && (
+                  <div className="flex items-center gap-2.5 mt-4">
+                    <Pressable
+                      onClick={handleSendNow}
+                      disabled={actionBusy !== null}
+                      className="press flex-1 bg-amber text-white rounded-[14px] px-4 py-3 text-[13px] font-bold flex items-center justify-center gap-2 hover:brightness-105 transition-[filter] disabled:opacity-50 disabled:transform-none"
+                    >
+                      {actionBusy === 'send' ? (
+                        <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5" />
+                      )}
+                      Send now
+                    </Pressable>
+                    <Pressable
+                      onClick={() => setEditing(true)}
+                      disabled={actionBusy !== null}
+                      className="press raised-sm rounded-[14px] px-4 py-3 text-[13px] font-semibold text-ink-dim flex items-center justify-center gap-2 disabled:opacity-50 disabled:transform-none"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Pressable>
+                  </div>
+                )}
+              </>
             ) : contact.personalization ? (
               <div className="recessed rounded-[16px] p-4">
-                <p className="font-display italic text-[14px] text-ink mb-2">“{contact.personalization}”</p>
+                <p className="font-display italic text-[14px] text-ink mb-2">"{contact.personalization}"</p>
                 <Badge tone="sage" className="mt-2">{contact.personalizationApproved ? 'approved' : 'generated'}</Badge>
               </div>
             ) : (
@@ -152,4 +324,32 @@ function toneFor(s: string): 'amber' | 'sage' | 'blue' | 'terra' | 'neutral' {
     'Follow-up 2': 'amber',
   }
   return map[s] || 'neutral'
+}
+
+function badgeToneFor(
+  status: string | undefined,
+  pending: { status: string } | null | undefined,
+  contact: { personalizationApproved: boolean | null } | null,
+  draft: { status: string } | null
+): 'amber' | 'sage' | 'blue' | 'neutral' {
+  if (status && ['Sent', 'Delivered', 'Follow-up 1', 'Follow-up 2', 'Replied', 'Closed'].includes(status)) return 'sage'
+  if (pending?.status === 'pending_review') return 'amber'
+  if (contact?.personalizationApproved) return 'sage'
+  if (draft) return 'amber'
+  return 'neutral'
+}
+
+function badgeTextFor(
+  status: string | undefined,
+  pending: { status: string } | null | undefined,
+  contact: { personalizationApproved: boolean | null } | null,
+  draft: { status: string } | null
+): string {
+  if (status && ['Sent', 'Delivered', 'Follow-up 1', 'Follow-up 2', 'Replied', 'Closed'].includes(status)) {
+    return status === 'Replied' ? 'replied' : 'sent'
+  }
+  if (pending?.status === 'pending_review') return 'pending review'
+  if (contact?.personalizationApproved) return 'ready to send'
+  if (draft) return 'draft ready'
+  return 'no draft'
 }

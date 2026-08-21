@@ -1,6 +1,21 @@
 import { getSupabaseClient } from './client.js';
 import { logger } from '../utils/logger.js';
 
+export async function getContactById(id) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Error getting contact by id:', { id, error: error.message });
+    throw error;
+  }
+  return data;
+}
+
 export async function findContactByEmail(email) {
   const supabase = getSupabaseClient();
   const normalized = email.toLowerCase().trim();

@@ -6,6 +6,9 @@ import { Pressable, RiseIn } from '@/components/motion'
 import { Card, SectionTitle, Badge, EmptyState, LoadingState } from '@/components/ui'
 import { GrowingBar } from '@/components/motion'
 
+// Campaign statuses come from the DB as 'Active'/'Paused'/'Completed'.
+const isActive = (status: string) => ['active', 'running'].includes(status.toLowerCase())
+
 export const CampaignsPage: React.FC = () => {
   const { campaigns, loading, stats } = useApp()
   const navigate = useNavigate()
@@ -34,7 +37,7 @@ export const CampaignsPage: React.FC = () => {
           <EmptyState title="No campaigns yet" hint="A default campaign is created on first import." />
         </Card>
       ) : (
-        <div className="grid grid-cols-2 gap-7 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-7 items-start">
           {campaigns.map((c, i) => {
             const pct = c.total ? Math.round((c.sent / c.total) * 100) : 0
             return (
@@ -45,7 +48,7 @@ export const CampaignsPage: React.FC = () => {
                       <SectionTitle className="text-[18px] leading-snug">{c.name}</SectionTitle>
                       {c.description && <p className="text-[12.5px] text-faint mt-1 line-clamp-2">{c.description}</p>}
                     </div>
-                    <Badge tone={c.status === 'active' || c.status === 'running' ? 'sage' : 'neutral'}>{c.status}</Badge>
+                    <Badge tone={isActive(c.status) ? 'sage' : 'neutral'}>{c.status}</Badge>
                   </div>
                   <div className="flex items-center justify-between font-mono text-[11px] text-faint mb-2">
                     <span>
@@ -54,7 +57,7 @@ export const CampaignsPage: React.FC = () => {
                     <span className="text-amber-ink">{pct}%</span>
                   </div>
                   <div className="recessed-sm h-2.5 rounded-full p-[3px]">
-                    <GrowingBar width={pct} color={c.status === 'active' || c.status === 'running' ? '#7FB069' : '#a89d91'} delay={300 + i * 100} />
+                    <GrowingBar width={pct} color={isActive(c.status) ? '#7FB069' : '#a89d91'} delay={300 + i * 100} />
                   </div>
                   <div className="flex items-center justify-between mt-4">
                     <p className="font-mono text-[10px] text-faint">{c.replied} replies · created {new Date(c.createdAt).toLocaleDateString()}</p>

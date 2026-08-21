@@ -18,6 +18,7 @@ export const config = Object.freeze({
   supabase: {
     url: getEnv('SUPABASE_URL', '', false),
     serviceKey: getEnv('SUPABASE_SERVICE_KEY', '', false),
+    anonKey: getEnv('SUPABASE_ANON_KEY', '', false),
   },
 
   airtable: {
@@ -53,6 +54,18 @@ export const config = Object.freeze({
     followup1Days: parseInt(getEnv('FOLLOWUP_1_DAYS', '7'), 10),
     followup2Days: parseInt(getEnv('FOLLOWUP_2_DAYS', '14'), 10),
     sendDelayMs: parseInt(getEnv('SEND_DELAY_MS', '2000'), 10),
+    smtpConcurrency: parseInt(getEnv('SMTP_CONCURRENCY', '1'), 10),
+  },
+
+  processing: {
+    personalizationConcurrency: parseInt(getEnv('PERSONALIZATION_CONCURRENCY', '5'), 10),
+    // How many profiles the research batch job researches in parallel (kept
+    // low on purpose — public web sources must be treated politely).
+    researchConcurrency: parseInt(getEnv('RESEARCH_CONCURRENCY', '3'), 10),
+  },
+
+  apify: {
+    token: getEnv('APIFY_TOKEN', ''),
   },
 
   security: {

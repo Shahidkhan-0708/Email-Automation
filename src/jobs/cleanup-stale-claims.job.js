@@ -1,7 +1,6 @@
 import cron from 'node-cron';
 import { resetStaleClaims } from '../db/outreach.js';
 import { logger } from '../utils/logger.js';
-
 export function scheduleCleanupStaleClaimsJob() {
   // Every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
